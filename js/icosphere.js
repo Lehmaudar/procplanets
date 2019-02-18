@@ -1,3 +1,5 @@
+var faceCache = [];
+
 function icosphere() {
   var geom = new THREE.Geometry();
   // const t = 0.5 + Math.sqrt(5) / 2; // TODO: test efficiency
@@ -53,7 +55,8 @@ function icosphere() {
     );
   });
   faces.forEach(face => {
-    geom.faces.push(new THREE.Face3(face[0], face[1], face[2]));
+    // geom.faces.push(new THREE.Face3(face[0], face[1], face[2]));
+    geom.faces.push(createFace(face, undefined, uuidv1()));
   });
 
   var mat = new THREE.MeshBasicMaterial({
@@ -64,7 +67,6 @@ function icosphere() {
 
   // subdiv(geom);
   addDetail(geom);
-  createTree(geom);
   scene.add(icosphere);
 
   geom.verticesNeedUpdate = true;
@@ -102,25 +104,58 @@ function bufferIcosphere(positions, faces, threeIcoGeometry) {
 }
 
 // creating a tree for keeping stock of faces and their hierarchy
-function createTree() {
-  // tree = {
-  //   children: []
-  // };
-  facesCache = [];
+function createFace(vertices, parent, uuid) {
+  const face = new THREE.Face3(vertices[0], vertices[1], vertices[2]);
 
-  console.log("tree: ", tree);
-}
+  // console.log(parent);
 
-function addToTree(face, children) {
-  key = facesCache.push({});
+  faceCache.push({
+    uuid: uuid,
+    face: face,
+    parent: parent,
+    children: []
+  });
+
+  return face;
 }
 
 // dynamic vertex generation
-function addChildFaces(face, childFaces) {}
 
 function addDetail(geom) {
-  subdivFace(geom, 10);
-  geom.faces.splice(10, 1);
+  // subdivFace(geom, 10);
+  // geom.faces.splice(10, 1);
+
+  for (let i = 0; i < 3; i++) {
+    var startFaces = [...faceCache];
+    for (let j = 0; j < startFaces.length; j++) {
+      addDetailToFace(geom, startFaces[j]);
+    }
+  }
+}
+
+function addDetailToFace(geom, cacheFace) {
+  const index = geom.faces.indexOf(cacheFace.face);
+  subdivFaceCache(geom, cacheFace);
+  geom.faces.splice(index, 1);
+}
+
+function subdivFaceCache(geom, cacheFace) {
+  const face = cacheFace.face;
+  const uuid = cacheFace.uuid;
+
+  const a = face.a;
+  const b = face.b;
+  const c = face.c;
+  const ab = midPoint(geom, a, b, geom.vertices[a], geom.vertices[b]);
+  const bc = midPoint(geom, b, c, geom.vertices[b], geom.vertices[c]);
+  const ca = midPoint(geom, c, a, geom.vertices[c], geom.vertices[a]);
+
+  cacheFace.children = [uuidv1(), uuidv1(), uuidv1(), uuidv1()];
+
+  geom.faces.push(createFace([a, ab, ca], uuid, cacheFace.children[0]));
+  geom.faces.push(createFace([ab, b, bc], uuid, cacheFace.children[1]));
+  geom.faces.push(createFace([ca, bc, c], uuid, cacheFace.children[2]));
+  geom.faces.push(createFace([ab, bc, ca], uuid, cacheFace.children[3]));
 }
 
 // subdivison
