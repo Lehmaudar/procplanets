@@ -48,7 +48,7 @@
       var stats, scene, renderer, composer;
       var camera, cameraControls;
       var Variables = function() {
-        this.speed = 0.0;
+        this.speed = 0.2;
       };
       var variables = new Variables();
       var gui = new dat.GUI();
@@ -126,9 +126,6 @@
             variables.speed * PIseconds * 0.0002 * (i % 2 ? 1 : -1);
         });
 
-        // check distance from camera
-        // console.log(camera.position);
-        // TODO: LOD(camera.position); THINGS ARE BAD
         LOD(camera.position);
 
         // actually render the scene
