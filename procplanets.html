@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>Three.js Boilerplate</title>
+    <title>ProcPlanets</title>
     <meta charset="utf-8" />
     <meta
       name="viewport"
@@ -125,6 +125,10 @@
           object3d.rotation.x =
             variables.speed * PIseconds * 0.0002 * (i % 2 ? 1 : -1);
         });
+
+        // check distance from camera
+        // console.log(camera.position);
+        // LOD(camera.position);
 
         // actually render the scene
         renderer.render(scene, camera);

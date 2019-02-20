@@ -1,7 +1,8 @@
 var faceCache = [];
+var geom;
 
 function icosphere() {
-  var geom = new THREE.Geometry();
+  geom = new THREE.Geometry();
   // const t = 0.5 + Math.sqrt(5) / 2; // TODO: test efficiency
   const t = 1.618;
 
@@ -69,11 +70,12 @@ function icosphere() {
   addDetail(geom);
   scene.add(icosphere);
 
+  // additional mesh with differen material
   geom.verticesNeedUpdate = true;
   geom.computeVertexNormals();
   var helpMat = new THREE.MeshNormalMaterial({});
   helpIcosphere = new THREE.Mesh(geom, helpMat);
-  scene.add(helpIcosphere);
+  // scene.add(helpIcosphere);
 }
 
 function bufferIcosphere(positions, faces, threeIcoGeometry) {
@@ -89,10 +91,6 @@ function bufferIcosphere(positions, faces, threeIcoGeometry) {
     }
   }
 
-  // var vertices = new Float32Array([
-  //   ...threeIcoGeometry.attributes.position.array
-  // ]);
-
   var geometry = new THREE.BufferGeometry();
   geometry.addAttribute("position", new THREE.BufferAttribute(vertices, 3));
   var material = new THREE.MeshBasicMaterial({
@@ -107,36 +105,74 @@ function bufferIcosphere(positions, faces, threeIcoGeometry) {
 function createFace(vertices, parent, uuid) {
   const face = new THREE.Face3(vertices[0], vertices[1], vertices[2]);
 
-  // console.log(parent);
+  const middlePos = [
+    (geom.vertices[vertices[0]].x +
+      geom.vertices[vertices[1]].x +
+      geom.vertices[vertices[2]].x) *
+      0.33,
+    (geom.vertices[vertices[0]].y +
+      geom.vertices[vertices[1]].y +
+      geom.vertices[vertices[2]].y) *
+      0.33,
+    (geom.vertices[vertices[0]].z +
+      geom.vertices[vertices[1]].z +
+      geom.vertices[vertices[2]].z) *
+      0.33
+  ];
 
   faceCache.push({
     uuid: uuid,
     face: face,
     parent: parent,
-    children: []
+    middlePos: middlePos,
+    children: [],
+    isRendered: true
   });
 
   return face;
 }
 
 // dynamic vertex generation
-
 function addDetail(geom) {
-  // subdivFace(geom, 10);
-  // geom.faces.splice(10, 1);
-
-  for (let i = 0; i < 3; i++) {
-    var startFaces = [...faceCache];
+  // basic face generation
+  for (let i = 0; i < 4; i++) {
+    // var startFaces = [...faceCache];
+    const startFaces = faceCache.filter(face => face.isRendered === true);
+    // for (let j = 0; j < 3; j++) {
     for (let j = 0; j < startFaces.length; j++) {
-      addDetailToFace(geom, startFaces[j]);
+      // addDetailToFace(geom, startFaces[j]);
+      addDetailToFaceRecursive(startFaces[j], 1);
     }
+  }
+
+  // tests
+  // addDetailToFace(faceCache[0]);
+  for (let index = 0; index < 1000000; index++) {
+    geom.faces.push(new THREE.Face3(0, 0, 0));
   }
 }
 
-function addDetailToFace(geom, cacheFace) {
+function addDetailToFace(cacheFace) {
   const index = geom.faces.indexOf(cacheFace.face);
   subdivFaceCache(geom, cacheFace);
   geom.faces.splice(index, 1);
+  cacheFace.isRendered = false;
+
+  console.log("asder");
+}
+
+function addDetailToFaceRecursive(cacheFace, recursions) {
+  if (recursions === 0) return;
+
+  const index = geom.faces.indexOf(cacheFace.face);
+  subdivFaceCache(geom, cacheFace);
+  geom.faces.splice(index, 1);
+  cacheFace.isRendered = false;
+
+  // TODO: mitte lslt child UUID vaid child ise
+  cacheFace.children.forEach(child => {
+    addDetailToFaceRecursive(getFaceFromCache(child), recursions - 1);
+  });
 }
 
 function subdivFaceCache(geom, cacheFace) {
@@ -158,21 +194,17 @@ function subdivFaceCache(geom, cacheFace) {
   geom.faces.push(createFace([ab, bc, ca], uuid, cacheFace.children[3]));
 }
 
-// subdivison
 function subdiv(geom) {
   divisions = 1;
   for (let i = 0; i < divisions; i++) {
     const facescount = geom.faces.length;
     // const facescount = 1;
     for (let index = 0; index < facescount; index++) {
-      // console.log("asd");
       subdivFace(geom, index);
     }
     for (let i = 0; i < facescount; i++) {
       geom.faces.shift();
     }
-
-    // subdivFace(geom, 10);
   }
 }
 
@@ -196,19 +228,68 @@ function subdivFace(geom, faceIndex) {
 function midPoint(geom, id1, id2, vertex1, vertex2) {
   const key = id1 < id2 ? `k_${id1}_${id2}` : `k_${id2}_${id1}`;
   if (midPoints[key]) {
-    // console.log("asd");
     geom.vertices[midPoints[key]].normalize();
     return midPoints[key];
   }
 
   geom.vertices.push(
     new THREE.Vector3(
-      (vertex1.x + vertex2.x) / 2,
-      (vertex1.y + vertex2.y) / 2,
-      (vertex1.z + vertex2.z) / 2
+      (vertex1.x + vertex2.x) * 0.5,
+      (vertex1.y + vertex2.y) * 0.5,
+      (vertex1.z + vertex2.z) * 0.5
     ) //.normalize()
   );
 
   midPoints[key] = geom.vertices.length - 1;
   return geom.vertices.length - 1;
+}
+
+function getFaceFromCache(uuid) {
+  return faceCache.find(face => face.uuid === uuid);
+}
+
+let asd = 1;
+let asdDate = Date.now() + 140;
+
+function LOD(cameraPos) {
+  // const uuid = "08740230-3496-11e9-af5e-e3202a47f8c0";
+  // const cacheFace = getFaceFromCache(uuid);
+  const cacheFace = faceCache[0];
+  const dist = distance(cacheFace.middlePos, [
+    cameraPos.x,
+    cameraPos.y,
+    cameraPos.z
+  ]);
+  // console.log(dist);
+
+  if (asd === 1 && asdDate < Date.now()) {
+    // TODO: this is not even possible, webgl doesn't allow adding faces to a mesh
+    // only way would be creating a huge amount of
+
+    console.log("asd");
+    addDetailToFace(cacheFace);
+    geom.computeBoundingSphere();
+
+    geom.elementsNeedUpdate = true;
+
+    asd = 0;
+  }
+
+  if (dist < 4 && cacheFace.isRendered) {
+    // console.log("asd");
+    // addDetailToFace(cacheFace);
+    // geom.verticesNeedUpdate = true;
+    // geom.computeVertexNormals();
+  }
+
+  // console.log(
+  //   distance(faceCache[0].middlePos, [cameraPos.x, cameraPos.y, cameraPos.z])
+  // );
+}
+
+function distance(posA, posB) {
+  const x = posA[0] - posB[0];
+  const y = posA[1] - posB[1];
+  const z = posA[2] - posB[2];
+  return Math.sqrt(x * x + y * y + z * z);
 }
