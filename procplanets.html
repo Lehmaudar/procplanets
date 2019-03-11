@@ -48,7 +48,7 @@
       var stats, scene, renderer, composer;
       var camera, cameraControls;
       var Variables = function() {
-        this.speed = 0.2;
+        this.speed = 0.0;
       };
       var variables = new Variables();
       var gui = new dat.GUI();
@@ -82,7 +82,7 @@
         camera = new THREE.PerspectiveCamera(
           35,
           window.innerWidth / window.innerHeight,
-          1,
+          0.00001,
           10000
         );
         camera.position.set(0, 0, 5);
@@ -118,15 +118,23 @@
         cameraControls.update();
 
         // animation of all objects
-        scene.traverse(function(object3d, i) {
-          if (object3d instanceof THREE.Mesh === false) return;
-          object3d.rotation.y =
-            variables.speed * PIseconds * 0.0003 * (i % 2 ? 1 : -1);
-          object3d.rotation.x =
-            variables.speed * PIseconds * 0.0002 * (i % 2 ? 1 : -1);
-        });
+        // scene.traverse(function(object3d, i) {
+        //   if (object3d instanceof THREE.Mesh === false) return;
+        //   object3d.rotation.y =
+        //     variables.speed * PIseconds * 0.0003 * (i % 2 ? 1 : -1);
+        //   object3d.rotation.x =
+        //     variables.speed * PIseconds * 0.0002 * (i % 2 ? 1 : -1);
+        // });
 
-        LOD(camera.position);
+        // icosphere.rotation.y =
+        //   variables.speed * PIseconds * 0.0003 * (0 % 2 ? 1 : -1);
+        // icosphere.rotation.x =
+        //   variables.speed * PIseconds * 0.0002 * (0 % 2 ? 1 : -1);
+
+        // LODauto(camera.position);
+        // LODdist(camera.position);
+        // liveColor(camera.position);
+        liveColorTree(camera.position);
 
         // actually render the scene
         renderer.render(scene, camera);

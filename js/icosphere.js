@@ -70,20 +70,27 @@ function icosphere() {
   });
 
   var mat = new THREE.MeshBasicMaterial({
-    wireframe: true
+    // wireframe: true,
+    wireframeLinewidth: 2,
+    vertexColors: THREE.VertexColors
   });
 
   icosphere = new THREE.Mesh(geom, mat);
+  icosphere.name = "Icosphere";
   scene.add(icosphere);
 
-  // addDetail(geom);
+  for (let i = 0; i < 0; i++) {
+    addDetail(geom);
+  }
 
   // additional mesh with different material
-  // geom.verticesNeedUpdate = true;
-  // geom.computeVertexNormals();
+  geom.computeVertexNormals();
   var helpMat = new THREE.MeshNormalMaterial({});
   helpIcosphere = new THREE.Mesh(geom, helpMat);
+  helpIcosphere.name = "helpIcosphere";
   // scene.add(helpIcosphere);
+
+  geom.computeVertexNormals();
 }
 
 function findFirstFreeFaceIndex() {
@@ -123,51 +130,56 @@ function createVertex(position, normalize, parents) {
   return cacheIndex;
 }
 
-// creating a tree for keeping stock of faces and their hierarchy
-function createFace(vertIndices, parent) {
+function createFace(cacheVertices, parent) {
   const middlePos = midPosOf3Verts(
-    vec3ToArray(geom.vertices[vertIndices[0]]),
-    vec3ToArray(geom.vertices[vertIndices[1]]),
-    vec3ToArray(geom.vertices[vertIndices[2]])
+    vec3ToArray(geom.vertices[cacheVertices[0]]),
+    vec3ToArray(geom.vertices[cacheVertices[1]]),
+    vec3ToArray(geom.vertices[cacheVertices[2]])
   );
 
-  const geomIndex = findFirstFreeFaceIndex();
+  const geometryIndex = findFirstFreeFaceIndex();
   const cacheIndex = faceCache.length;
-  const face = geom.faces[geomIndex];
+  const face = geom.faces[geometryIndex];
+  let generation = 0;
+  if (parent != undefined) {
+    generation = faceCache[parent].generation + 1;
+  }
+
+  face.color.setRGB(Math.random(), Math.random(), Math.random());
+
   face.isFree = false;
-  face.a = vertIndices[0];
-  face.b = vertIndices[1];
-  face.c = vertIndices[2];
+  face.a = cacheVertices[0];
+  face.b = cacheVertices[1];
+  face.c = cacheVertices[2];
+  // face.vertexColors.push(new THREE.Color(0xff00ff));
+  // face.vertexColors.push(new THREE.Color(0xff00ff));
+  // face.vertexColors.push(new THREE.Color(0xff00ff));
 
   faceCache.push({
     cacheIndex: cacheIndex,
-    geomIndex: geomIndex,
-    vertices: vertIndices,
+    geometryIndex: geometryIndex,
+    cacheVertices: cacheVertices,
     face: face,
     parent: parent,
     middlePos: middlePos,
     children: [],
-    isRendered: true
+    isRendered: true,
+    generation: generation
   });
 
   return cacheIndex;
 }
 
-// basic subdivsion
 function addDetail() {
   for (let i = 0; i < 1; i++) {
     const startFaces = faceCache.filter(face => face.isRendered === true);
-    // for (let j = 0; j < 2; j++) {
     for (let j = 0; j < startFaces.length; j++) {
-      // addDetailToFace(geom, startFaces[j]);
       subdivCacheFace(startFaces[j], 1);
     }
-    // console.log(startFaces);
   }
 }
 
 function subdivCacheFace(cacheFace) {
-  // console.log(cacheFace);
   const face = cacheFace.face;
   const parentIndex = cacheFace.cacheIndex;
 
@@ -189,7 +201,6 @@ function subdivCacheFace(cacheFace) {
 }
 
 function midPoint(idA, idB, vertexA, vertexB) {
-  // const parents = id1 < id2 ? `k_${id1}_${id2}` : `k_${id2}_${id1}`;
   const sameParents = vertexCache.filter(vertex =>
     idA < idB
       ? vertex.parents[0] === idA && vertex.parents[1] === idB
@@ -197,7 +208,6 @@ function midPoint(idA, idB, vertexA, vertexB) {
   );
 
   if (sameParents.length > 0) {
-    // console.log(sameParents);
     normalizeVertex(sameParents[0]);
     return sameParents[0].cacheIndex;
   }
@@ -205,24 +215,18 @@ function midPoint(idA, idB, vertexA, vertexB) {
   const index = createVertex(
     midPosOf2Verts(vec3ToArray(vertexA), vec3ToArray(vertexB)),
     false,
-    // TODO: use parent uuids
     idA < idB ? [idA, idB] : [idB, idA]
   );
 
   return index;
 }
 
-function getFaceFromCache(uuid) {
-  return faceCache.find(face => face.uuid === uuid);
-}
+let count = 3000;
+let sleepDate = Date.now() + 1200;
 
-let count = 5;
-let sleepDate = Date.now() + 3000;
-
-function LOD(cameraPos) {
+function LODauto(cameraPos) {
   if (count > 0 && sleepDate < Date.now()) {
     addDetail();
-
     geom.elementsNeedUpdate = true;
 
     sleepDate += 1000;
@@ -230,11 +234,91 @@ function LOD(cameraPos) {
   }
 }
 
+function LODdist(cameraPosVec) {
+  if (count > 0) {
+    faceCache.forEach(cacheFace => {
+      const dist = distance(vec3ToArray(cameraPosVec), cacheFace.middlePos);
+
+      if (cacheFace.isRendered && dist < 3) {
+        subdivCacheFace(cacheFace);
+      }
+
+      count -= 1;
+    });
+
+    geom.elementsNeedUpdate = true;
+    sleepDate += 1000;
+  }
+}
+
+function liveColor(cameraPosVec) {
+  const cameraPos = vec3ToArray(cameraPosVec);
+  const meshDist = distance(cameraPos, [0, 0, 0]);
+  console.log(meshDist);
+
+  for (let i = 0; i < faceCache.length; i++) {
+    const baseFace = faceCache[i];
+    const faceDist = distance(cameraPos, baseFace.middlePos);
+
+    if (baseFace.isRendered) {
+      colorFace(baseFace.face, faceDist, meshDist);
+    }
+  }
+  // geom.elementsNeedUpdate = true;
+  geom.colorsNeedUpdate = true;
+}
+
+const tesselationConstant = 0.3;
+
+function liveColorTree(cameraPosVec) {
+  const cameraPos = vec3ToArray(cameraPosVec);
+  const meshDist = distance(cameraPos, [0, 0, 0]);
+
+  const gen = 1;
+  // console.log(Math.pow(0.5, gen) / meshDist);
+  for (let i = 0; i < faceCache.length; i++) {
+    const baseFace = faceCache[i];
+    const faceDist = distance(cameraPos, baseFace.middlePos);
+
+    if (baseFace.isRendered) {
+      colorFaceTree(baseFace, faceDist, meshDist);
+    }
+  }
+  geom.colorsNeedUpdate = true;
+}
+
+var counter = 1;
+function colorFaceTree(cacheFace, dist, meshDist) {
+  const relativedist = (dist - meshDist + 1) / 2;
+  if (Math.pow(0.5, cacheFace.generation) / dist > tesselationConstant) {
+    // cacheFace.face.color.setRGB(0.1, relativedist, 0.5);
+    // console.log(cacheFace);
+
+    // if (cacheFace.generation == 0) {
+    subdivCacheFace(cacheFace);
+    geom.elementsNeedUpdate = true;
+    // }
+  } else {
+    // cacheFace.face.color.setRGB(relativedist, 0.1, 0.1);
+  }
+}
+
+function colorFace(face, dist, meshDist) {
+  const relativedist = (dist - meshDist + 1) / 2;
+  console.log(relativedist);
+  // console.log("asd");
+  if (dist < 3) {
+    face.color.setRGB(0.1, relativedist, 0.5);
+  } else {
+    face.color.setRGB(relativedist, 0.1, 0.1);
+  }
+}
+
 // simple functions
 function removeFace(cacheFace) {
   cacheFace.face.isFree = true;
   cacheFace.isRendered = false;
-  cacheFace.geomIndex = undefined;
+  cacheFace.geometryIndex = undefined;
   cacheFace.face.a = 0;
   cacheFace.face.b = 0;
   cacheFace.face.c = 0;
