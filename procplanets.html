@@ -152,10 +152,13 @@
             variables.spinSpeed * PIseconds * 0.0002 * (i % 2 ? 1 : -1);
         });
 
-        if (variables.tessZoomIn)
-          LOD(camera.position, variables.tessConstant, variables.tessGive);
-        if (variables.tessZoomOut)
-          LODD(camera.position, variables.tessConstant, variables.tessGive);
+        LOD(
+          camera.position,
+          variables.tessConstant,
+          variables.tessGive,
+          variables.tessZoomIn,
+          variables.tessZoomOut
+        );
 
         // actually render the scene
         renderer.render(scene, camera);

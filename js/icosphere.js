@@ -239,70 +239,66 @@ function midPoint(idA, idB) {
   return index;
 }
 
-counter = 0;
-
-function LODD(cameraPosVec, tesselationConstant, tessGive) {
-  // console.log("asd");
+function LOD(
+  cameraPosVec,
+  tesselationConstant,
+  tessGive,
+  tessZoomIn,
+  tessZoomOut
+) {
   const cameraPos = vec3ToArray(cameraPosVec);
   const meshDist = distance(cameraPos, [0, 0, 0]);
+  // TODO: mby use this for not generating backside
+  // TODO: SEE POLE JU ISEGI TREE STRUKTUURIGA????
 
-  for (let i = 0; i < faceCache.length; i++) {
-    const baseFace = faceCache[i];
-    const faceDist = distance(cameraPos, baseFace.middlePos);
+  faceCache.forEach(cacheFace => {
+    const faceDist = distance(cameraPos, cacheFace.middlePos);
+    const faceEdgeLenght = Math.pow(0.5, cacheFace.generation) / faceDist;
 
     if (
-      !baseFace.isRendered &&
-      baseFace.children.length != 0 &&
-      faceCache[baseFace.children[0]].isRendered
+      tessZoomIn &&
+      cacheFace.isRendered &&
+      faceEdgeLenght > tesselationConstant + tessGive
     ) {
-      // console.log("asd");
-      LODDhelper(baseFace, faceDist, meshDist, tesselationConstant, tessGive);
+      subdivCacheFace(cacheFace);
+      geom.elementsNeedUpdate = true;
     }
-  }
-}
-
-function LODDhelper(cacheFace, dist, meshDist, tesselationConstant, tessGive) {
-  if (
-    Math.pow(0.5, cacheFace.generation) / dist <
-    tesselationConstant - tessGive
-    // && counter < 300
-  ) {
-    // cacheFace.face.color.setRGB(0.1, relativedist, 0.5);
-    console.log("undiv", cacheFace);
-    undivCacheFace(cacheFace);
-    geom.elementsNeedUpdate = true;
-    counter += 1;
-  } else {
-    // cacheFace.face.color.setRGB(relativedist, 0.1, 0.1);
-  }
-}
-
-function LOD(cameraPosVec, tesselationConstant, tessGive) {
-  const cameraPos = vec3ToArray(cameraPosVec);
-  const meshDist = distance(cameraPos, [0, 0, 0]);
-
-  for (let i = 0; i < faceCache.length; i++) {
-    const baseFace = faceCache[i];
-    const faceDist = distance(cameraPos, baseFace.middlePos);
-
-    if (baseFace.isRendered) {
-      LODhelper(baseFace, faceDist, meshDist, tesselationConstant, tessGive);
+    if (
+      tessZoomOut &&
+      !cacheFace.isRendered &&
+      cacheFace.children.length != 0 &&
+      faceCache[cacheFace.children[0]].isRendered &&
+      faceEdgeLenght < tesselationConstant - tessGive
+    ) {
+      undivCacheFace(cacheFace);
+      geom.elementsNeedUpdate = true;
     }
-  }
-  // geom.colorsNeedUpdate = true;
-}
+  });
 
-function LODhelper(cacheFace, dist, meshDist, tesselationConstant, tessGive) {
-  if (
-    Math.pow(0.5, cacheFace.generation) / dist >
-    tesselationConstant + tessGive
-  ) {
-    // cacheFace.face.color.setRGB(0.1, relativedist, 0.5);
-    subdivCacheFace(cacheFace);
-    geom.elementsNeedUpdate = true;
-  } else {
-    // cacheFace.face.color.setRGB(relativedist, 0.1, 0.1);
-  }
+  // for (let i = 0; i < faceCache.length; i++) {
+  //   const cacheFace = faceCache[i];
+  //   const faceDist = distance(cameraPos, cacheFace.middlePos);
+  //   const faceEdgeLenght = Math.pow(0.5, cacheFace.generation) / faceDist;
+
+  //   if (
+  //     tessZoomIn &&
+  //     cacheFace.isRendered &&
+  //     faceEdgeLenght > tesselationConstant + tessGive
+  //   ) {
+  //     subdivCacheFace(cacheFace);
+  //     geom.elementsNeedUpdate = true;
+  //   }
+  //   if (
+  //     tessZoomOut &&
+  //     !cacheFace.isRendered &&
+  //     cacheFace.children.length != 0 &&
+  //     faceCache[cacheFace.children[0]].isRendered &&
+  //     faceEdgeLenght < tesselationConstant - tessGive
+  //   ) {
+  //     undivCacheFace(cacheFace);
+  //     geom.elementsNeedUpdate = true;
+  //   }
+  // }
 }
 
 // simple functions
@@ -317,18 +313,19 @@ function findFirstFreeFaceIndex() {
 
 function removeCacheFace(cacheFace) {
   if (cacheFace.geometryIndex == undefined) {
+    cacheFace;
     throw new Error(
-      "MyError: geometryIndex can't be undefined when removing face"
+      "MyError: geometryIndex should not be undefined when removing a face \n"
     );
   }
 
   cacheFace.isRendered = false;
   const geomFace = geom.faces[cacheFace.geometryIndex];
-  geomFace.isFree = true;
   geomFace.b = 0;
   geomFace.a = 0;
   geomFace.c = 0;
   cacheFace.geometryIndex = undefined;
+  geomFace.isFree = true;
   // TODO: kui neid enam ei renderdata siis ei pea vist abc muutma
 }
 
