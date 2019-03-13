@@ -78,9 +78,11 @@ function icosphere() {
   icosphere.name = "Icosphere";
   scene.add(icosphere);
 
-  for (let i = 0; i < 2; i++) {
-    addDetail(geom);
+  for (let i = 0; i < 0; i++) {
+    // TODO: why error here with old addDetail and i < 2
+    addDetail();
   }
+  // removeDetail();
 
   // additional mesh with different material
   geom.computeVertexNormals();
@@ -130,12 +132,12 @@ function createFace(cacheVertices, parent) {
   const geometryIndex = findFirstFreeFaceIndex();
   const cacheIndex = faceCache.length;
   const face = geom.faces[geometryIndex];
-  let generation = 0;
+  let depth = 0;
   if (parent != undefined) {
-    generation = faceCache[parent].generation + 1;
+    depth = faceCache[parent].depth + 1;
   }
 
-  const colorT = generation / 4;
+  const colorT = depth / 4;
   face.color.setRGB(
     Math.random() - 0.6 + 0.6 * colorT,
     Math.random() + 0.3 - 0.3 * colorT,
@@ -159,22 +161,41 @@ function createFace(cacheVertices, parent) {
     middlePos: middlePos,
     children: [],
     isRendered: true,
-    generation: generation
+    depth: depth,
+    minDepth: depth,
+    maxDepth: depth
   });
 
   return cacheIndex;
 }
 
 function addDetail() {
-  for (let i = 0; i < 1; i++) {
-    const startFaces = faceCache.filter(face => face.isRendered === true);
-    for (let j = 0; j < startFaces.length; j++) {
-      subdivCacheFace(startFaces[j], 1);
-    }
-  }
+  faceCache
+    .filter(face => face.isRendered)
+    .forEach(face => {
+      if (face.isRendered) {
+        subdivCacheFace(face);
+      }
+    });
+}
+
+function removeDetail() {
+  faceCache
+    .filter(
+      face =>
+        !face.isRendered &&
+        face.children.length != 0 &&
+        faceCache[face.children[0]].isRendered
+    )
+    .forEach(face => {
+      undivCacheFace(face);
+    });
 }
 
 function subdivCacheFace(cacheFace) {
+  cacheFace.maxDepth += 1;
+  cacheFace.minDepth += 1;
+  increaseTreeDepth(cacheFace);
   if (cacheFace.children.length == 0) {
     const face = cacheFace.face;
     const parentIndex = cacheFace.cacheIndex;
@@ -206,13 +227,55 @@ function subdivCacheFace(cacheFace) {
   }
 }
 
+function increaseTreeDepth(cacheFace) {
+  const cacheParent = faceCache[cacheFace.parent];
+  if (cacheParent != undefined && cacheFace.maxDepth > cacheParent.maxDepth) {
+    cacheParent.maxDepth = cacheFace.maxDepth;
+    increaseTreeDepth(cacheParent);
+  }
+  if (
+    cacheFace.depth != 0 &&
+    faceCache[cacheParent.children[0]].minDepth >= cacheFace.minDepth &&
+    faceCache[cacheParent.children[1]].minDepth >= cacheFace.minDepth &&
+    faceCache[cacheParent.children[2]].minDepth >= cacheFace.minDepth &&
+    faceCache[cacheParent.children[3]].minDepth >= cacheFace.minDepth
+  ) {
+    cacheParent.minDepth = cacheFace.minDepth;
+  }
+}
+
 function undivCacheFace(cacheFace) {
   // console.log(cacheFace);
   cacheFace.children.forEach(childIndex => {
     removeCacheFace(faceCache[childIndex]);
   });
 
+  cacheFace.minDepth = cacheFace.depth;
+  cacheFace.maxDepth = cacheFace.depth;
+  lowerTreeDepth(cacheFace);
   addCacheFace(cacheFace);
+}
+
+function lowerTreeDepth(cacheFace) {
+  const cacheParent = faceCache[cacheFace.parent];
+  if (
+    cacheFace.depth != 0 &&
+    cacheParent.children[0].minDepth >= cacheFace.minDepth &&
+    cacheParent.children[1].minDepth >= cacheFace.minDepth &&
+    cacheParent.children[2].minDepth >= cacheFace.minDepth &&
+    cacheParent.children[3].minDepth >= cacheFace.minDepth
+  ) {
+    cacheParent.minDepth = cacheFace.minDepth;
+  }
+  if (
+    cacheFace.depth != 0 &&
+    cacheParent.children[0].maxDepth <= cacheFace.maxDepth &&
+    cacheParent.children[1].maxDepth <= cacheFace.maxDepth &&
+    cacheParent.children[2].maxDepth <= cacheFace.maxDepth &&
+    cacheParent.children[3].maxDepth <= cacheFace.maxDepth
+  ) {
+    cacheParent.maxDepth = cacheFace.maxDepth;
+  }
 }
 
 function midPoint(idA, idB) {
@@ -251,9 +314,10 @@ function LOD(
   // TODO: mby use this for not generating backside
   // TODO: SEE POLE JU ISEGI TREE STRUKTUURIGA????
 
-  faceCache.forEach(cacheFace => {
+  for (let i = 0; i < faceCache.length; i++) {
+    const cacheFace = faceCache[i];
     const faceDist = distance(cameraPos, cacheFace.middlePos);
-    const faceEdgeLenght = Math.pow(0.5, cacheFace.generation) / faceDist;
+    const faceEdgeLenght = Math.pow(0.5, cacheFace.depth) / faceDist;
 
     if (
       tessZoomIn &&
@@ -273,32 +337,7 @@ function LOD(
       undivCacheFace(cacheFace);
       geom.elementsNeedUpdate = true;
     }
-  });
-
-  // for (let i = 0; i < faceCache.length; i++) {
-  //   const cacheFace = faceCache[i];
-  //   const faceDist = distance(cameraPos, cacheFace.middlePos);
-  //   const faceEdgeLenght = Math.pow(0.5, cacheFace.generation) / faceDist;
-
-  //   if (
-  //     tessZoomIn &&
-  //     cacheFace.isRendered &&
-  //     faceEdgeLenght > tesselationConstant + tessGive
-  //   ) {
-  //     subdivCacheFace(cacheFace);
-  //     geom.elementsNeedUpdate = true;
-  //   }
-  //   if (
-  //     tessZoomOut &&
-  //     !cacheFace.isRendered &&
-  //     cacheFace.children.length != 0 &&
-  //     faceCache[cacheFace.children[0]].isRendered &&
-  //     faceEdgeLenght < tesselationConstant - tessGive
-  //   ) {
-  //     undivCacheFace(cacheFace);
-  //     geom.elementsNeedUpdate = true;
-  //   }
-  // }
+  }
 }
 
 // simple functions
