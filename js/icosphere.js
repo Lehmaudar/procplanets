@@ -182,14 +182,19 @@ function addDetail() {
 function removeDetail() {
   faceCache
     .filter(
-      face =>
-        !face.isRendered &&
-        face.children.length != 0 &&
-        faceCache[face.children[0]].isRendered
+      cacheFace =>
+        !cacheFace.isRendered &&
+        // cacheFace.geometryIndex == undefined &&
+        cacheFace.children.length != 0 &&
+        faceCache[cacheFace.children[0]].isRendered &&
+        faceCache[cacheFace.children[1]].isRendered &&
+        faceCache[cacheFace.children[2]].isRendered &&
+        faceCache[cacheFace.children[3]].isRendered
     )
-    .forEach(face => {
-      undivCacheFace(face);
+    .forEach(cacheFace => {
+      undivCacheFace(cacheFace);
     });
+  removeWeirdFaces();
 }
 
 function subdivCacheFace(cacheFace) {
@@ -197,7 +202,7 @@ function subdivCacheFace(cacheFace) {
   cacheFace.minDepth += 1;
   increaseTreeDepth(cacheFace);
   if (cacheFace.children.length == 0) {
-    const face = cacheFace.face;
+    // const face = cacheFace.face;
     const parentIndex = cacheFace.cacheIndex;
 
     // const a = face.a;
@@ -228,6 +233,7 @@ function subdivCacheFace(cacheFace) {
 }
 
 function increaseTreeDepth(cacheFace) {
+  // console.log("increaseTreeDepth");
   const cacheParent = faceCache[cacheFace.parent];
   if (cacheParent != undefined && cacheFace.maxDepth > cacheParent.maxDepth) {
     cacheParent.maxDepth = cacheFace.maxDepth;
@@ -245,7 +251,6 @@ function increaseTreeDepth(cacheFace) {
 }
 
 function undivCacheFace(cacheFace) {
-  // console.log(cacheFace);
   cacheFace.children.forEach(childIndex => {
     removeCacheFace(faceCache[childIndex]);
   });
@@ -260,21 +265,23 @@ function lowerTreeDepth(cacheFace) {
   const cacheParent = faceCache[cacheFace.parent];
   if (
     cacheFace.depth != 0 &&
-    cacheParent.children[0].minDepth >= cacheFace.minDepth &&
-    cacheParent.children[1].minDepth >= cacheFace.minDepth &&
-    cacheParent.children[2].minDepth >= cacheFace.minDepth &&
-    cacheParent.children[3].minDepth >= cacheFace.minDepth
+    faceCache[cacheParent.children[0]].minDepth >= cacheFace.minDepth &&
+    faceCache[cacheParent.children[1]].minDepth >= cacheFace.minDepth &&
+    faceCache[cacheParent.children[2]].minDepth >= cacheFace.minDepth &&
+    faceCache[cacheParent.children[3]].minDepth >= cacheFace.minDepth
   ) {
     cacheParent.minDepth = cacheFace.minDepth;
+    lowerTreeDepth(cacheParent);
   }
   if (
     cacheFace.depth != 0 &&
-    cacheParent.children[0].maxDepth <= cacheFace.maxDepth &&
-    cacheParent.children[1].maxDepth <= cacheFace.maxDepth &&
-    cacheParent.children[2].maxDepth <= cacheFace.maxDepth &&
-    cacheParent.children[3].maxDepth <= cacheFace.maxDepth
+    faceCache[cacheParent.children[0]].maxDepth >= cacheFace.maxDepth &&
+    faceCache[cacheParent.children[1]].maxDepth >= cacheFace.maxDepth &&
+    faceCache[cacheParent.children[2]].maxDepth >= cacheFace.maxDepth &&
+    faceCache[cacheParent.children[3]].maxDepth >= cacheFace.maxDepth
   ) {
     cacheParent.maxDepth = cacheFace.maxDepth;
+    lowerTreeDepth(cacheParent);
   }
 }
 
@@ -302,6 +309,10 @@ function midPoint(idA, idB) {
   return index;
 }
 
+let distCalcs = 0;
+let lenCalcs = 0;
+let counter = 0;
+
 function LOD(
   cameraPosVec,
   tesselationConstant,
@@ -309,15 +320,130 @@ function LOD(
   tessZoomIn,
   tessZoomOut
 ) {
+  if (counter == 60) {
+    console.log(distCalcs, lenCalcs, counter);
+  }
+  counter += 1;
+  const cameraPos = vec3ToArray(cameraPosVec);
+  for (let i = 0; i < 20; i++) {
+    const startFace = faceCache[i];
+
+    LODRek(
+      startFace,
+      cameraPos,
+      tesselationConstant,
+      tessGive,
+      tessZoomIn,
+      tessZoomOut
+    );
+  }
+}
+
+function LODRek(
+  cacheFace,
+  cameraPos,
+  tesselationConstant,
+  tessGive,
+  tessZoomIn,
+  tessZoomOut
+) {
+  const faceDist = distance(cameraPos, cacheFace.middlePos);
+  const minDepthEdgeLenghtView = Math.pow(0.5, cacheFace.minDepth) / faceDist;
+  const maxDepthEdgeLenghtView =
+    Math.pow(0.5, cacheFace.maxDepth - 1) / faceDist;
+  distCalcs += 1;
+  lenCalcs += 2;
+
+  if (tessZoomIn && minDepthEdgeLenghtView > tesselationConstant + tessGive) {
+    if (cacheFace.minDepth == cacheFace.depth) {
+      if (cacheFace.minDepth > cacheFace.depth && children.length == 0) {
+        throw new Error(
+          "MyError: minDepth can't be higher than depth if face \
+          does not have children"
+        );
+      }
+      subdivCacheFace(cacheFace);
+      geom.elementsNeedUpdate = true;
+    } else {
+      cacheFace.children.forEach(child => {
+        LODRek(
+          faceCache[child],
+          cameraPos,
+          tesselationConstant,
+          tessGive,
+          tessZoomIn,
+          tessZoomOut
+        );
+      });
+    }
+  } else if (
+    tessZoomOut &&
+    maxDepthEdgeLenghtView < tesselationConstant - tessGive
+  ) {
+    if (
+      cacheFace.children.length != 0 &&
+      cacheFace.maxDepth == faceCache[cacheFace.children[0]].depth &&
+      // alumisi ei tohiks vaja olla
+      faceCache[cacheFace.children[0]].isRendered &&
+      faceCache[cacheFace.children[1]].isRendered &&
+      faceCache[cacheFace.children[2]].isRendered &&
+      faceCache[cacheFace.children[3]].isRendered &&
+      !cacheFace.isRendered
+    ) {
+      undivCacheFace(cacheFace);
+      geom.elementsNeedUpdate = true;
+    } else {
+      // console.log("paha");
+      cacheFace.children.forEach(child => {
+        LODRek(
+          faceCache[child],
+          cameraPos,
+          tesselationConstant,
+          tessGive,
+          tessZoomIn,
+          tessZoomOut
+        );
+      });
+    }
+  }
+  //  else if (
+  //   tessZoomOut &&
+  //   !cacheFace.isRendered &&
+  //   cacheFace.children.length != 0 &&
+  //   faceCache[cacheFace.children[0]].isRendered &&
+  //   faceCache[cacheFace.children[1]].isRendered &&
+  //   faceCache[cacheFace.children[2]].isRendered &&
+  //   faceCache[cacheFace.children[3]].isRendered &&
+  //   faceEdgeLenght < tesselationConstant - tessGive
+  // ) {
+  //   undivCacheFace(cacheFace);
+  //   geom.elementsNeedUpdate = true;
+  // }
+}
+
+function LODold(
+  cameraPosVec,
+  tesselationConstant,
+  tessGive,
+  tessZoomIn,
+  tessZoomOut
+) {
+  if (counter == 60) {
+    console.log(distCalcs, lenCalcs, counter);
+  }
+  counter += 1;
   const cameraPos = vec3ToArray(cameraPosVec);
   const meshDist = distance(cameraPos, [0, 0, 0]);
   // TODO: mby use this for not generating backside
   // TODO: SEE POLE JU ISEGI TREE STRUKTUURIGA????
 
-  for (let i = 0; i < faceCache.length; i++) {
+  // for (let i = 0; i < faceCache.length; i++) {
+  for (let i = 0; i < 1; i++) {
     const cacheFace = faceCache[i];
     const faceDist = distance(cameraPos, cacheFace.middlePos);
+    distCalcs += 1;
     const faceEdgeLenght = Math.pow(0.5, cacheFace.depth) / faceDist;
+    lenCalcs += 1;
 
     if (
       tessZoomIn &&
@@ -326,16 +452,34 @@ function LOD(
     ) {
       subdivCacheFace(cacheFace);
       geom.elementsNeedUpdate = true;
-    }
-    if (
+    } else if (
       tessZoomOut &&
       !cacheFace.isRendered &&
       cacheFace.children.length != 0 &&
       faceCache[cacheFace.children[0]].isRendered &&
+      faceCache[cacheFace.children[1]].isRendered &&
+      faceCache[cacheFace.children[2]].isRendered &&
+      faceCache[cacheFace.children[3]].isRendered &&
       faceEdgeLenght < tesselationConstant - tessGive
     ) {
       undivCacheFace(cacheFace);
       geom.elementsNeedUpdate = true;
+    }
+  }
+
+  removeWeirdFaces();
+}
+
+function removeWeirdFaces() {
+  for (let i = 0; i < faceCache.length; i++) {
+    const cacheFace = faceCache[i];
+    if (
+      cacheFace.isRendered &&
+      faceCache[cacheFace.parent] != undefined &&
+      faceCache[cacheFace.parent].maxDepth < cacheFace.depth
+    ) {
+      removeCacheFace(cacheFace);
+      console.log("removeWeirdFaces() REMOVED");
     }
   }
 }
@@ -351,11 +495,8 @@ function findFirstFreeFaceIndex() {
 }
 
 function removeCacheFace(cacheFace) {
-  if (cacheFace.geometryIndex == undefined) {
-    cacheFace;
-    throw new Error(
-      "MyError: geometryIndex should not be undefined when removing a face \n"
-    );
+  if (cacheFace.isRendered == false) {
+    throw new Error("MyError: face should be rendered before removing it");
   }
 
   cacheFace.isRendered = false;
