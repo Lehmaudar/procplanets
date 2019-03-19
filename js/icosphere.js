@@ -104,17 +104,17 @@ function createVertex(position, normalize, parents) {
   if (normalize) {
     vertex.normalize();
     normalizedPos = [vertex.x, vertex.y, vertex.z];
-    originalPosition = undefined;
+    originalPos = undefined;
   } else {
     normalizedPos = undefined;
-    originalPosition = position;
+    originalPos = position;
   }
 
   vertexCache.push({
     cacheIndex: cacheIndex,
     normalizedPos: normalizedPos,
-    originalPosition: position,
-    vertex: vertex,
+    originalPos: position,
+    geometryIndex: cacheIndex,
     // TODO: change to parentA and parentB
     parents: parents
   });
@@ -228,6 +228,10 @@ function subdivCacheFace(cacheFace) {
 
     cacheFace.children.forEach(childIndex => {
       addCacheFace(faceCache[childIndex]);
+
+      faceCache[childIndex].cacheVertices.forEach(vertexIndex => {
+        normalizeVertex(vertexCache[vertexIndex]);
+      });
     });
   }
 }
@@ -251,7 +255,18 @@ function increaseTreeDepth(cacheFace) {
 }
 
 function undivCacheFace(cacheFace) {
+  // deNormalizeFace(cacheFace);
+
   cacheFace.children.forEach(childIndex => {
+    // TODO: proovi vertexcoloriga vaadata
+    // kas ikka denormalitakse vajalikku vertexit
+
+    // deNormalizeFace(faceCache[childIndex]);
+    // faceCache[childIndex].cacheVertices.forEach(vertex => {
+    // deNormalizeVertex(vertexCache[vertex]);
+    // });
+    // console.log(childIndex);
+    // deNormalizeFace(faceCache[childIndex]);
     removeCacheFace(faceCache[childIndex]);
   });
 
@@ -259,9 +274,16 @@ function undivCacheFace(cacheFace) {
   cacheFace.maxDepth = cacheFace.depth;
   lowerTreeDepth(cacheFace);
   addCacheFace(cacheFace);
+  // console.log(geom.faces[cacheFace.geometryIndex]);
+  // geom.faces[cacheFace.geometryIndex].color.setRGB(
+  //   Math.random() * 0.1,
+  //   Math.random() * 0.1,
+  //   0.1 * cacheFace.depth
+  // );
 }
 
 function lowerTreeDepth(cacheFace) {
+  // console.log("lowerTreeDepth");
   const cacheParent = faceCache[cacheFace.parent];
   if (
     cacheFace.depth != 0 &&
@@ -275,10 +297,10 @@ function lowerTreeDepth(cacheFace) {
   }
   if (
     cacheFace.depth != 0 &&
-    faceCache[cacheParent.children[0]].maxDepth >= cacheFace.maxDepth &&
-    faceCache[cacheParent.children[1]].maxDepth >= cacheFace.maxDepth &&
-    faceCache[cacheParent.children[2]].maxDepth >= cacheFace.maxDepth &&
-    faceCache[cacheParent.children[3]].maxDepth >= cacheFace.maxDepth
+    faceCache[cacheParent.children[0]].maxDepth <= cacheFace.maxDepth &&
+    faceCache[cacheParent.children[1]].maxDepth <= cacheFace.maxDepth &&
+    faceCache[cacheParent.children[2]].maxDepth <= cacheFace.maxDepth &&
+    faceCache[cacheParent.children[3]].maxDepth <= cacheFace.maxDepth
   ) {
     cacheParent.maxDepth = cacheFace.maxDepth;
     lowerTreeDepth(cacheParent);
@@ -320,8 +342,10 @@ function LOD(
   tessZoomIn,
   tessZoomOut
 ) {
-  if (counter == 60) {
+  if (counter % 600 == 0) {
     console.log(distCalcs, lenCalcs, counter);
+    distCalcs = 0;
+    lenCalcs = 0;
   }
   counter += 1;
   const cameraPos = vec3ToArray(cameraPosVec);
@@ -393,7 +417,6 @@ function LODRek(
       undivCacheFace(cacheFace);
       geom.elementsNeedUpdate = true;
     } else {
-      // console.log("paha");
       cacheFace.children.forEach(child => {
         LODRek(
           faceCache[child],
@@ -406,19 +429,6 @@ function LODRek(
       });
     }
   }
-  //  else if (
-  //   tessZoomOut &&
-  //   !cacheFace.isRendered &&
-  //   cacheFace.children.length != 0 &&
-  //   faceCache[cacheFace.children[0]].isRendered &&
-  //   faceCache[cacheFace.children[1]].isRendered &&
-  //   faceCache[cacheFace.children[2]].isRendered &&
-  //   faceCache[cacheFace.children[3]].isRendered &&
-  //   faceEdgeLenght < tesselationConstant - tessGive
-  // ) {
-  //   undivCacheFace(cacheFace);
-  //   geom.elementsNeedUpdate = true;
-  // }
 }
 
 function LODold(
@@ -428,44 +438,56 @@ function LODold(
   tessZoomIn,
   tessZoomOut
 ) {
-  if (counter == 60) {
+  if (counter % 600 == 0) {
     console.log(distCalcs, lenCalcs, counter);
+    distCalcs = 0;
+    lenCalcs = 0;
   }
   counter += 1;
   const cameraPos = vec3ToArray(cameraPosVec);
   const meshDist = distance(cameraPos, [0, 0, 0]);
   // TODO: mby use this for not generating backside
-  // TODO: SEE POLE JU ISEGI TREE STRUKTUURIGA????
 
-  // for (let i = 0; i < faceCache.length; i++) {
-  for (let i = 0; i < 1; i++) {
-    const cacheFace = faceCache[i];
-    const faceDist = distance(cameraPos, cacheFace.middlePos);
-    distCalcs += 1;
-    const faceEdgeLenght = Math.pow(0.5, cacheFace.depth) / faceDist;
-    lenCalcs += 1;
+  faceCache
+    .filter(
+      cacheFace =>
+        cacheFace.isRendered ||
+        (cacheFace.children.length != 0 &&
+          (faceCache[cacheFace.children[0]].isRendered &&
+            faceCache[cacheFace.children[1]].isRendered &&
+            faceCache[cacheFace.children[2]].isRendered &&
+            faceCache[cacheFace.children[3]].isRendered))
+    )
+    .forEach(cacheFace => {
+      // for (let i = 0; i < faceCache.length; i++) {
+      // const cacheFace = faceCache[i];
+      const faceDist = distance(cameraPos, cacheFace.middlePos);
+      distCalcs += 1;
+      const faceEdgeLenght = Math.pow(0.5, cacheFace.depth) / faceDist;
+      lenCalcs += 1;
 
-    if (
-      tessZoomIn &&
-      cacheFace.isRendered &&
-      faceEdgeLenght > tesselationConstant + tessGive
-    ) {
-      subdivCacheFace(cacheFace);
-      geom.elementsNeedUpdate = true;
-    } else if (
-      tessZoomOut &&
-      !cacheFace.isRendered &&
-      cacheFace.children.length != 0 &&
-      faceCache[cacheFace.children[0]].isRendered &&
-      faceCache[cacheFace.children[1]].isRendered &&
-      faceCache[cacheFace.children[2]].isRendered &&
-      faceCache[cacheFace.children[3]].isRendered &&
-      faceEdgeLenght < tesselationConstant - tessGive
-    ) {
-      undivCacheFace(cacheFace);
-      geom.elementsNeedUpdate = true;
-    }
-  }
+      if (
+        tessZoomIn &&
+        cacheFace.isRendered &&
+        faceEdgeLenght > tesselationConstant + tessGive
+      ) {
+        subdivCacheFace(cacheFace);
+        geom.elementsNeedUpdate = true;
+      } else if (
+        tessZoomOut &&
+        !cacheFace.isRendered &&
+        cacheFace.children.length != 0 &&
+        faceCache[cacheFace.children[0]].isRendered &&
+        faceCache[cacheFace.children[1]].isRendered &&
+        faceCache[cacheFace.children[2]].isRendered &&
+        faceCache[cacheFace.children[3]].isRendered &&
+        faceEdgeLenght < tesselationConstant - tessGive
+      ) {
+        undivCacheFace(cacheFace);
+        geom.elementsNeedUpdate = true;
+      }
+      // }
+    });
 
   removeWeirdFaces();
 }
@@ -522,12 +544,44 @@ function addCacheFace(cacheFace) {
 
 function normalizeVertex(cacheVertex) {
   if (cacheVertex.normalizedPos === undefined) {
-    cacheVertex.vertex.normalize();
-    cacheVertex.normalizedPos = [
-      cacheVertex.vertex.x,
-      cacheVertex.vertex.y,
-      cacheVertex.vertex.z
-    ];
+    const vertex = geom.vertices[cacheVertex.geometryIndex];
+    vertex.normalize();
+    cacheVertex.normalizedPos = [vertex.x, vertex.y, vertex.z];
+  } else {
+    const vertex = geom.vertices[cacheVertex.geometryIndex];
+    vertex.x = cacheVertex.normalizedPos[0];
+    vertex.y = cacheVertex.normalizedPos[1];
+    vertex.z = cacheVertex.normalizedPos[2];
+    geom.verticesNeedUpdate = true;
+  }
+}
+
+function deNormalizeFace(cacheFace) {
+  if (cacheFace.depth != 0) {
+    for (let i = 0; i < cacheFace.children.length; i++) {
+      const child = faceCache[cacheFace.children[i]];
+      geom.faces[child.geometryIndex].color.setRGB(
+        0.1 * cacheFace.depth,
+        Math.random() * 0.1,
+        Math.random() * 0.1
+      );
+      for (let j = 0; j < child.cacheVertices.length; j++) {
+        const vertex = vertexCache[child.cacheVertices[j]];
+        deNormalizeVertex(vertex);
+      }
+    }
+  }
+}
+
+function deNormalizeVertex(cacheVertex) {
+  if (cacheVertex.cacheIndex >= 12) {
+    console.log("denormal", cacheVertex.geometryIndex);
+    const vertex = geom.vertices[cacheVertex.cacheIndex];
+    vertex.x = cacheVertex.originalPos[0];
+    vertex.y = cacheVertex.originalPos[1];
+    vertex.z = cacheVertex.originalPos[2];
+    geom.verticesNeedUpdate = true;
+    geom.elementsNeedUpdate = true;
   }
 }
 

@@ -57,7 +57,7 @@
           this.tessConstant = 0.25;
           this.tessGive = 0.05;
           this.tessZoomIn = true;
-          this.tessZoomOut = false;
+          this.tessZoomOut = true;
           this.wireframe = false;
           this.addDetail = function() {
             addDetail();
@@ -68,6 +68,7 @@
             icosphere.geometry.elementsNeedUpdate = true;
           };
           this.vertexColors = true;
+          this.useTreeStruc = true;
         };
 
         var variables = new Variables();
@@ -82,6 +83,7 @@
         folder2.add(variables, "tessGive", 0, 0.1);
         folder2.add(variables, "tessZoomIn");
         folder2.add(variables, "tessZoomOut");
+        folder2.add(variables, "useTreeStruc");
         folder2.add(variables, "addDetail");
         folder2.add(variables, "removeDetail");
         var wireframe = folder1.add(variables, "wireframe");
@@ -166,13 +168,23 @@
             variables.spinSpeed * PIseconds * 0.0002 * (i % 2 ? 1 : -1);
         });
 
-        LOD(
-          camera.position,
-          variables.tessConstant,
-          variables.tessGive,
-          variables.tessZoomIn,
-          variables.tessZoomOut
-        );
+        if (variables.useTreeStruc) {
+          LOD(
+            camera.position,
+            variables.tessConstant,
+            variables.tessGive,
+            variables.tessZoomIn,
+            variables.tessZoomOut
+          );
+        } else {
+          LODold(
+            camera.position,
+            variables.tessConstant,
+            variables.tessGive,
+            variables.tessZoomIn,
+            variables.tessZoomOut
+          );
+        }
 
         // actually render the scene
         renderer.render(scene, camera);
