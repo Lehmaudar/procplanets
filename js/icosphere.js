@@ -62,7 +62,7 @@ function icosphere() {
   }
 
   baseVertices.forEach(vertex => {
-    createVertex(vertex, true, [-1, -1]);
+    createVertex(vertex, true, [undefined, undefined], undefined);
   });
 
   baseFaces.forEach(face => {
@@ -78,12 +78,6 @@ function icosphere() {
   icosphere.name = "Icosphere";
   scene.add(icosphere);
 
-  for (let i = 0; i < 0; i++) {
-    // TODO: why error here with old addDetail and i < 2
-    addDetail();
-  }
-  // removeDetail();
-
   // additional mesh with different material
   geom.computeVertexNormals();
   var helpMat = new THREE.MeshNormalMaterial({});
@@ -94,7 +88,7 @@ function icosphere() {
   geom.computeVertexNormals();
 }
 
-function createVertex(position, normalize, parents) {
+function createVertex(position, normalize, parentVerts, firstParentFaceIndex) {
   const cacheIndex = vertexCache.length;
   const vertex = geom.vertices[cacheIndex];
   vertex.x = position[0];
@@ -116,7 +110,9 @@ function createVertex(position, normalize, parents) {
     originalPos: position,
     geometryIndex: cacheIndex,
     // TODO: change to parentA and parentB
-    parents: parents
+    parentVerts: parentVerts,
+    parentFaceA: [firstParentFaceIndex, true],
+    parentFaceB: [undefined, false]
   });
 
   return cacheIndex;
@@ -138,19 +134,20 @@ function createFace(cacheVertices, parent) {
   }
 
   const colorT = depth / 4;
-  face.color.setRGB(
-    Math.random() - 0.6 + 0.6 * colorT,
-    Math.random() + 0.3 - 0.3 * colorT,
-    Math.random() + 0.3 - 0.3 * colorT
-  );
+  const colors = [];
+  colors.push(Math.random() - 0.6 + 0.6 * colorT);
+  colors.push(Math.random() + 0.3 - 0.3 * colorT);
+  colors.push(Math.random() + 0.3 - 0.3 * colorT);
+  colors.forEach(color => {
+    if (color >= 1) color = Math.random();
+    // if (color >= 1) color = -1 + Math.random();
+  });
+  face.color.setRGB(...colors);
 
   face.isFree = false;
   face.a = cacheVertices[0];
   face.b = cacheVertices[1];
   face.c = cacheVertices[2];
-  // face.vertexColors.push(new THREE.Color(0xff00ff));
-  // face.vertexColors.push(new THREE.Color(0xff00ff));
-  // face.vertexColors.push(new THREE.Color(0xff00ff));
 
   faceCache.push({
     cacheIndex: cacheIndex,
@@ -202,18 +199,15 @@ function subdivCacheFace(cacheFace) {
   cacheFace.minDepth += 1;
   increaseTreeDepth(cacheFace);
   if (cacheFace.children.length == 0) {
-    // const face = cacheFace.face;
+    const cacheIndex = cacheFace.cacheIndex;
     const parentIndex = cacheFace.cacheIndex;
 
-    // const a = face.a;
-    // const b = face.b;
-    // const c = face.c;
     const a = cacheFace.cacheVertices[0];
     const b = cacheFace.cacheVertices[1];
     const c = cacheFace.cacheVertices[2];
-    const ab = midPoint(a, b);
-    const bc = midPoint(b, c);
-    const ca = midPoint(c, a);
+    const ab = a < b ? midPoint(a, b, cacheIndex) : midPoint(b, a, cacheIndex);
+    const bc = b < c ? midPoint(b, c, cacheIndex) : midPoint(c, b, cacheIndex);
+    const ca = c < a ? midPoint(c, a, cacheIndex) : midPoint(a, c, cacheIndex);
 
     removeCacheFace(cacheFace);
 
@@ -228,10 +222,6 @@ function subdivCacheFace(cacheFace) {
 
     cacheFace.children.forEach(childIndex => {
       addCacheFace(faceCache[childIndex]);
-
-      faceCache[childIndex].cacheVertices.forEach(vertexIndex => {
-        normalizeVertex(vertexCache[vertexIndex]);
-      });
     });
   }
 }
@@ -255,18 +245,7 @@ function increaseTreeDepth(cacheFace) {
 }
 
 function undivCacheFace(cacheFace) {
-  // deNormalizeFace(cacheFace);
-
   cacheFace.children.forEach(childIndex => {
-    // TODO: proovi vertexcoloriga vaadata
-    // kas ikka denormalitakse vajalikku vertexit
-
-    // deNormalizeFace(faceCache[childIndex]);
-    // faceCache[childIndex].cacheVertices.forEach(vertex => {
-    // deNormalizeVertex(vertexCache[vertex]);
-    // });
-    // console.log(childIndex);
-    // deNormalizeFace(faceCache[childIndex]);
     removeCacheFace(faceCache[childIndex]);
   });
 
@@ -274,12 +253,6 @@ function undivCacheFace(cacheFace) {
   cacheFace.maxDepth = cacheFace.depth;
   lowerTreeDepth(cacheFace);
   addCacheFace(cacheFace);
-  // console.log(geom.faces[cacheFace.geometryIndex]);
-  // geom.faces[cacheFace.geometryIndex].color.setRGB(
-  //   Math.random() * 0.1,
-  //   Math.random() * 0.1,
-  //   0.1 * cacheFace.depth
-  // );
 }
 
 function lowerTreeDepth(cacheFace) {
@@ -307,16 +280,16 @@ function lowerTreeDepth(cacheFace) {
   }
 }
 
-function midPoint(idA, idB) {
-  const sameParents = vertexCache.filter(vertex =>
-    idA < idB
-      ? vertex.parents[0] === idA && vertex.parents[1] === idB
-      : vertex.parents[0] === idB && vertex.parents[1] === idA
+function midPoint(idA, idB, cacheFaceIndex) {
+  const sameParents = vertexCache.filter(
+    vertex => vertex.parentVerts[0] === idA && vertex.parentVerts[1] === idB
   );
 
   if (sameParents.length > 0) {
-    normalizeVertex(sameParents[0]);
-    return sameParents[0].cacheIndex;
+    const cacheVertex = sameParents[0];
+    cacheVertex.parentFaceB = [cacheFaceIndex, true];
+    normalizeVertex(cacheVertex);
+    return cacheVertex.cacheIndex;
   }
 
   const index = createVertex(
@@ -325,7 +298,8 @@ function midPoint(idA, idB) {
       vec3ToArray(geom.vertices[idB])
     ),
     false,
-    idA < idB ? [idA, idB] : [idB, idA]
+    [idA, idB],
+    cacheFaceIndex
   );
 
   return index;
@@ -343,7 +317,7 @@ function LOD(
   tessZoomOut
 ) {
   if (counter % 600 == 0) {
-    console.log(distCalcs, lenCalcs, counter);
+    // console.log(distCalcs, lenCalcs, counter);
     distCalcs = 0;
     lenCalcs = 0;
   }
@@ -439,7 +413,7 @@ function LODold(
   tessZoomOut
 ) {
   if (counter % 600 == 0) {
-    console.log(distCalcs, lenCalcs, counter);
+    // console.log(distCalcs, lenCalcs, counter);
     distCalcs = 0;
     lenCalcs = 0;
   }
@@ -459,8 +433,6 @@ function LODold(
             faceCache[cacheFace.children[3]].isRendered))
     )
     .forEach(cacheFace => {
-      // for (let i = 0; i < faceCache.length; i++) {
-      // const cacheFace = faceCache[i];
       const faceDist = distance(cameraPos, cacheFace.middlePos);
       distCalcs += 1;
       const faceEdgeLenght = Math.pow(0.5, cacheFace.depth) / faceDist;
@@ -486,7 +458,6 @@ function LODold(
         undivCacheFace(cacheFace);
         geom.elementsNeedUpdate = true;
       }
-      // }
     });
 
   removeWeirdFaces();
@@ -521,6 +492,7 @@ function removeCacheFace(cacheFace) {
     throw new Error("MyError: face should be rendered before removing it");
   }
 
+  normalizeFace(cacheFace);
   cacheFace.isRendered = false;
   const geomFace = geom.faces[cacheFace.geometryIndex];
   geomFace.b = 0;
@@ -532,6 +504,7 @@ function removeCacheFace(cacheFace) {
 }
 
 function addCacheFace(cacheFace) {
+  deNormalizeFace(cacheFace);
   cacheFace.isRendered = true;
   cacheFace.geometryIndex = findFirstFreeFaceIndex();
   geom.faces[cacheFace.geometryIndex].isFree = false;
@@ -542,46 +515,57 @@ function addCacheFace(cacheFace) {
   geomFace.c = cacheFace.cacheVertices[2];
 }
 
+function normalizeFace(cacheFace) {
+  vertexCache.forEach(cacheVertex => {
+    if (cacheVertex.parentFaceA[0] == cacheFace.cacheIndex) {
+      cacheVertex.parentFaceA[1] = true;
+      normalizeVertex(cacheVertex);
+    } else if (cacheVertex.parentFaceB[0] == cacheFace.cacheIndex) {
+      cacheVertex.parentFaceB[1] = true;
+      normalizeVertex(cacheVertex);
+    }
+  });
+}
+
 function normalizeVertex(cacheVertex) {
-  if (cacheVertex.normalizedPos === undefined) {
-    const vertex = geom.vertices[cacheVertex.geometryIndex];
-    vertex.normalize();
-    cacheVertex.normalizedPos = [vertex.x, vertex.y, vertex.z];
-  } else {
-    const vertex = geom.vertices[cacheVertex.geometryIndex];
-    vertex.x = cacheVertex.normalizedPos[0];
-    vertex.y = cacheVertex.normalizedPos[1];
-    vertex.z = cacheVertex.normalizedPos[2];
+  const vertex = geom.vertices[cacheVertex.geometryIndex];
+  if (
+    cacheVertex.parentFaceA[1] == true &&
+    cacheVertex.parentFaceB[1] == true
+  ) {
+    if (cacheVertex.normalizedPos == undefined) {
+      vertex.normalize();
+      cacheVertex.normalizedPos = [vertex.x, vertex.y, vertex.z];
+    } else {
+      vertex.x = cacheVertex.normalizedPos[0];
+      vertex.y = cacheVertex.normalizedPos[1];
+      vertex.z = cacheVertex.normalizedPos[2];
+    }
     geom.verticesNeedUpdate = true;
   }
 }
 
 function deNormalizeFace(cacheFace) {
-  if (cacheFace.depth != 0) {
-    for (let i = 0; i < cacheFace.children.length; i++) {
-      const child = faceCache[cacheFace.children[i]];
-      geom.faces[child.geometryIndex].color.setRGB(
-        0.1 * cacheFace.depth,
-        Math.random() * 0.1,
-        Math.random() * 0.1
-      );
-      for (let j = 0; j < child.cacheVertices.length; j++) {
-        const vertex = vertexCache[child.cacheVertices[j]];
-        deNormalizeVertex(vertex);
-      }
+  vertexCache.forEach(cacheVertex => {
+    if (cacheVertex.parentFaceA[0] == cacheFace.cacheIndex) {
+      cacheVertex.parentFaceA[1] = false;
+      deNormalizeVertex(cacheVertex);
+    } else if (cacheVertex.parentFaceB[0] == cacheFace.cacheIndex) {
+      cacheVertex.parentFaceB[1] = false;
+      deNormalizeVertex(cacheVertex);
     }
-  }
+  });
 }
 
 function deNormalizeVertex(cacheVertex) {
-  if (cacheVertex.cacheIndex >= 12) {
-    console.log("denormal", cacheVertex.geometryIndex);
-    const vertex = geom.vertices[cacheVertex.cacheIndex];
+  if (
+    cacheVertex.parentFaceA[1] == false ||
+    cacheVertex.parentFaceB[1] == false
+  ) {
+    const vertex = geom.vertices[cacheVertex.geometryIndex];
     vertex.x = cacheVertex.originalPos[0];
     vertex.y = cacheVertex.originalPos[1];
     vertex.z = cacheVertex.originalPos[2];
-    geom.verticesNeedUpdate = true;
-    geom.elementsNeedUpdate = true;
   }
 }
 
