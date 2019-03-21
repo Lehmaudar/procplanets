@@ -54,6 +54,7 @@ function icosphere() {
   for (let i = 0; i < 100000; i++) {
     const face = new THREE.Face3(0, 0, 0);
     face.isFree = true;
+    face.color.setRGB(Math.random(), Math.random(), Math.random());
     geom.faces.push(face);
 
     const vertex = new THREE.Vector3(0, 0, 0);
@@ -86,6 +87,8 @@ function icosphere() {
   // scene.add(helpIcosphere);
 
   geom.computeVertexNormals();
+
+  // icoControls();
 }
 
 function createVertex(position, normalize, parentVerts, firstParentFaceIndex) {
@@ -134,14 +137,15 @@ function createFace(cacheVertices, parent) {
   }
 
   const colorT = depth / 4;
-  const colors = [];
+  let colors = [];
   colors.push(Math.random() - 0.6 + 0.6 * colorT);
   colors.push(Math.random() + 0.3 - 0.3 * colorT);
   colors.push(Math.random() + 0.3 - 0.3 * colorT);
-  colors.forEach(color => {
-    if (color >= 1) color = Math.random();
-    // if (color >= 1) color = -1 + Math.random();
-  });
+  for (let i = 0; i < 3; i++) {
+    if (colors[i] >= 1) colors[i] = Math.random() * 0.1 + 0.9;
+    if (colors[i] <= 0) colors[i] = Math.random() * 0.1;
+  }
+  // console.log(colors);
   face.color.setRGB(...colors);
 
   face.isFree = false;
@@ -323,6 +327,9 @@ function LOD(
   }
   counter += 1;
   const cameraPos = vec3ToArray(cameraPosVec);
+
+  // console.log(distance(cameraPos, [0, 0, 0]));
+
   for (let i = 0; i < 20; i++) {
     const startFace = faceCache[i];
 
@@ -345,7 +352,12 @@ function LODRek(
   tessZoomIn,
   tessZoomOut
 ) {
-  const faceDist = distance(cameraPos, cacheFace.middlePos);
+  let pos = 0;
+  pos = cacheFace.middlePos;
+  pos = vec3ToArray(group.localToWorld(arrayToVec3(pos)));
+  // console.log(vec3ToArray(group.localToWorld(arrayToVec3(pos))));
+  // console.log(arrayToVec3(pos), group.localToWorld(arrayToVec3(pos)));
+  const faceDist = distance(cameraPos, pos);
   const minDepthEdgeLenghtView = Math.pow(0.5, cacheFace.minDepth) / faceDist;
   const maxDepthEdgeLenghtView =
     Math.pow(0.5, cacheFace.maxDepth - 1) / faceDist;
@@ -594,4 +606,8 @@ function midPosOf3Verts(vertexA, vertexB, vertexC) {
 
 function vec3ToArray(vector3) {
   return [vector3.x, vector3.y, vector3.z];
+}
+
+function arrayToVec3(array) {
+  return new THREE.Vector3(array[0], array[1], array[2]);
 }

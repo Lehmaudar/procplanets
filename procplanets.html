@@ -24,6 +24,15 @@
       type="text/javascript"
       src="js/external/TrackballControls.js"
     ></script>
+    <script type="text/javascript" src="js/external/FlyControls.js"></script>
+    <script
+      type="text/javascript"
+      src="js/external/PointerLockControls.js"
+    ></script>
+    <script
+      type="text/javascript"
+      src="js/external/threex.keyboardstate.js"
+    ></script>
 
     <!-- Project js files -->
     <script type="text/javascript" src="js/icosphere.js"></script>
@@ -43,12 +52,16 @@
   <body>
     <div id="container"></div>
     <script type="text/javascript">
-      var stats, gui, scene, renderer, composer;
-      var camera, cameraControls;
-      var icosphere;
-      var variables = datGui();
+      var scene, renderer, composer, camera, icosphere;
+      var stats, gui, cameraControls, keyboard;
+      // var variables = datGui();
+      var mouseSpeed = 0;
+      var clock = new THREE.Clock();
+      var keyboard = new THREEx.KeyboardState();
 
-      if (!init()) animate();
+      init();
+      var variables = datGui();
+      animate();
 
       // dat.gui ui
       function datGui() {
@@ -69,15 +82,18 @@
           };
           this.vertexColors = true;
           this.useTreeStruc = true;
+          this.customControls = true;
         };
 
-        var variables = new Variables();
-        var gui = new dat.GUI();
+        variables = new Variables();
+        gui = new dat.GUI();
 
         var folder1 = gui.addFolder("Appearance");
         var folder2 = gui.addFolder("Tesselation");
-        folder1.open();
-        folder2.open();
+        var folder3 = gui.addFolder("Controls");
+        // folder1.open();
+        // folder2.open();
+        folder3.open();
         folder1.add(variables, "spinSpeed", 0, 2);
         folder2.add(variables, "tessConstant", 0.0005, 0.6);
         folder2.add(variables, "tessGive", 0, 0.1);
@@ -97,18 +113,37 @@
             : (icosphere.material.vertexColors = 0);
           icosphere.material.needsUpdate = true;
         });
-
+        var customControls = folder3.add(variables, "customControls");
+        trackballControls.enabled = false;
+        customControls.onChange(function(value) {
+          value;
+          if (value) {
+            trackballControls.reset();
+            mouseSpeed = 0;
+            trackballControls.enabled = false;
+          } else {
+            trackballControls.enabled = true;
+          }
+        });
         return variables;
       }
 
       // init the scene
       function init() {
         renderer = new THREE.WebGLRenderer({
-          antialias: true // to get smoother output
+          antialias: true
         });
-        renderer.setClearColor(0x000);
         renderer.setSize(window.innerWidth, window.innerHeight);
-        document.getElementById("container").appendChild(renderer.domElement);
+        document.body.appendChild(renderer.domElement);
+
+        // window event listeners
+        window.addEventListener("wheel", onMouseWheel, false);
+        window.addEventListener("resize", onWindowResize, false);
+
+        // add keyboard
+        keyboard = new THREEx.KeyboardState(renderer.domElement);
+        renderer.domElement.setAttribute("tabIndex", "0");
+        renderer.domElement.focus();
 
         // add Stats.js - https://github.com/mrdoob/stats.js
         stats = new Stats();
@@ -130,43 +165,53 @@
         scene.add(camera);
 
         // create a camera contol
-        cameraControls = new THREE.TrackballControls(
+        trackballControls = new THREE.TrackballControls(
           camera,
           renderer.domElement
         );
+        trackballControls.minDistance = 1.01;
+        // trackballControls = new THREE.PointerLockControls(camera);
+        // trackballControls.lock();
+        // scene.add(trackballControls.getObject());
+
+        // create a camera contol
+        // cameraControls = new THREE.FlyControls(camera, renderer.domElement);
 
         // Objects
         icosphere();
+        group = new THREE.Object3D(); //create an empty container
+        group.add(icosphere); //add a mesh with geometry to it
+        scene.add(group); //when done, add the group to the scene
       }
+
+      // let lastTimeMsec
 
       // animation loop
       function animate() {
         requestAnimationFrame(animate);
+        delta = clock.getDelta();
 
-        // do the render
+        // update camera controls
+        if (!variables.customControls) {
+          trackballControls.update();
+        } else {
+          parseControls(delta);
+        }
+
+        // console.log(camera.position);
+
+        // focus on canvas in case gui has been pressed
+        renderer.domElement.setAttribute("tabIndex", "0");
+        renderer.domElement.focus();
+
         render();
 
-        // update stats
         stats.update();
       }
 
-      // render the scene
       function render() {
         // variable which is increase by Math.PI every seconds - usefull for animation
         var PIseconds = Date.now() * Math.PI;
-
-        // update camera controls
-        cameraControls.update();
-
-        // animation of all objects
-        scene.traverse(function(object3d, i) {
-          // TODO: spin camera not objects
-          if (object3d instanceof THREE.Mesh === false) return;
-          object3d.rotation.y =
-            variables.spinSpeed * PIseconds * 0.0003 * (i % 2 ? 1 : -1);
-          object3d.rotation.x =
-            variables.spinSpeed * PIseconds * 0.0002 * (i % 2 ? 1 : -1);
-        });
 
         if (variables.useTreeStruc) {
           LOD(
@@ -188,6 +233,61 @@
 
         // actually render the scene
         renderer.render(scene, camera);
+      }
+
+      function parseControls(delta, now) {
+        // exponential = Math.pow(camera.position.z - 1, 2) / 40;
+        exponential = Math.pow(camera.position.z - 1, 1.2) / 40;
+
+        if (keyboard.pressed("left")) {
+          group.rotateOnWorldAxis(
+            new THREE.Vector3(0, 1, 0),
+            -10 * delta * exponential
+          );
+        } else if (keyboard.pressed("right")) {
+          group.rotateOnWorldAxis(
+            new THREE.Vector3(0, 1, 0),
+            10 * delta * exponential
+          );
+        }
+        if (keyboard.pressed("down")) {
+          group.rotateOnWorldAxis(
+            new THREE.Vector3(1, 0, 0),
+            10 * delta * exponential
+          );
+        } else if (keyboard.pressed("up")) {
+          group.rotateOnWorldAxis(
+            new THREE.Vector3(1, 0, 0),
+            -10 * delta * exponential
+          );
+        }
+
+        camera.position.z -= mouseSpeed * delta * exponential * 2;
+
+        if (camera.position.z < 1.001) camera.position.z = 1.001;
+        else if (camera.position.z > 60) camera.position.z = 60;
+        if (mouseSpeed < -0.1) mouseSpeed += 0.1;
+        else if (mouseSpeed > 0.1) mouseSpeed -= 0.1;
+        else mouseSpeed = 0;
+      }
+
+      function onMouseWheel(event) {
+        event.preventDefault();
+        const mouseDelta = -event.deltaY / 150;
+        // console.log(mouseDelta);
+        if (
+          (mouseDelta > 0 && mouseSpeed < 0) ||
+          (mouseDelta < 0 && mouseSpeed > 0)
+        ) {
+          mouseSpeed = 0;
+        }
+        mouseSpeed += mouseDelta;
+      }
+
+      function onWindowResize() {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
       }
     </script>
   </body>

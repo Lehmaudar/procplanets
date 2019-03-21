@@ -1,2 +1,6 @@
 # Don't track content of these folders
 js/external
+
+# Don't track these files
+keyboardexamp.html
+misc_controls_fly.html
