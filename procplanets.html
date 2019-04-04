@@ -24,11 +24,6 @@
       type="text/javascript"
       src="js/external/TrackballControls.js"
     ></script>
-    <script type="text/javascript" src="js/external/FlyControls.js"></script>
-    <script
-      type="text/javascript"
-      src="js/external/PointerLockControls.js"
-    ></script>
     <script
       type="text/javascript"
       src="js/external/threex.keyboardstate.js"
@@ -56,6 +51,7 @@
       var stats, gui, cameraControls, keyboard;
       // var variables = datGui();
       var mouseSpeed = 0;
+      let zoomSpeed;
       var clock = new THREE.Clock();
       var keyboard = new THREEx.KeyboardState();
 
@@ -67,7 +63,7 @@
       function datGui() {
         var Variables = function() {
           this.spinSpeed = 0.0;
-          this.tessConstant = 0.15;
+          this.tessConstant = 0.1;
           this.tessGive = 0.01;
           this.tessZoomIn = true;
           this.tessZoomOut = true;
@@ -82,7 +78,7 @@
           };
           this.vertexColors = true;
           this.useTreeStruc = true;
-          this.customControls = true;
+          this.smootherControls = true;
         };
 
         variables = new Variables();
@@ -92,10 +88,10 @@
         var folder2 = gui.addFolder("Tesselation");
         var folder3 = gui.addFolder("Controls");
         // folder1.open();
-        // folder2.open();
-        folder3.open();
+        folder2.open();
+        // folder3.open();
         folder1.add(variables, "spinSpeed", 0, 2);
-        folder2.add(variables, "tessConstant", 0.0005, 0.6);
+        folder2.add(variables, "tessConstant", 0.0005, 0.2);
         folder2.add(variables, "tessGive", 0, 0.1);
         folder2.add(variables, "tessZoomIn");
         folder2.add(variables, "tessZoomOut");
@@ -113,16 +109,18 @@
             : (icosphere.material.vertexColors = 0);
           icosphere.material.needsUpdate = true;
         });
-        var customControls = folder3.add(variables, "customControls");
-        trackballControls.enabled = false;
-        customControls.onChange(function(value) {
+        var smootherControls = folder3.add(variables, "smootherControls");
+        // trackballControls.enabled = false;
+        smootherControls.onChange(function(value) {
           value;
           if (value) {
             trackballControls.reset();
-            mouseSpeed = 0;
-            trackballControls.enabled = false;
+            trackballControls.minDistance = 0;
           } else {
-            trackballControls.enabled = true;
+            trackballControls.zoomSpeed = 1.2;
+            trackballControls.rotateSpeed = 1.0;
+            trackballControls.minDistance = 1.0001;
+            trackballControls.reset();
           }
         });
         return variables;
@@ -137,7 +135,7 @@
         document.body.appendChild(renderer.domElement);
 
         // window event listeners
-        window.addEventListener("wheel", onMouseWheel, false);
+        // window.addEventListener("wheel", onMouseWheel, false);
         window.addEventListener("resize", onWindowResize, false);
 
         // add keyboard
@@ -169,22 +167,15 @@
           camera,
           renderer.domElement
         );
-        trackballControls.minDistance = 1.01;
-        // trackballControls = new THREE.PointerLockControls(camera);
-        // trackballControls.lock();
-        // scene.add(trackballControls.getObject());
-
-        // create a camera contol
-        // cameraControls = new THREE.FlyControls(camera, renderer.domElement);
+        // trackballControls.minDistance = 1.00001;
+        trackballControls.maxDistance = 40;
 
         // Objects
         icosphere();
-        group = new THREE.Object3D(); //create an empty container
-        group.add(icosphere); //add a mesh with geometry to it
-        scene.add(group); //when done, add the group to the scene
+        group = new THREE.Object3D();
+        group.add(icosphere);
+        scene.add(group);
       }
-
-      // let lastTimeMsec
 
       // animation loop
       function animate() {
@@ -192,10 +183,10 @@
         delta = clock.getDelta();
 
         // update camera controls
-        if (!variables.customControls) {
-          trackballControls.update();
+        if (variables.smootherControls) {
+          smootherControls(delta);
         } else {
-          parseControls(delta);
+          trackballControls.update();
         }
 
         // console.log(camera.position);
@@ -235,53 +226,39 @@
         renderer.render(scene, camera);
       }
 
-      function parseControls(delta, now) {
-        // exponential = Math.pow(camera.position.z - 1, 2) / 40;
-        exponential = Math.pow(camera.position.z - 1, 1.2) / 40;
+      function smootherControls() {
+        const oldPos = vec3ToArray(camera.position);
+        const oldRot = vec3ToArray(camera.rotation);
+        const cameraDist = distance(oldPos, [0, 0, 0]);
 
-        if (keyboard.pressed("left")) {
-          group.rotateOnWorldAxis(
-            new THREE.Vector3(0, 1, 0),
-            -10 * delta * exponential
-          );
-        } else if (keyboard.pressed("right")) {
-          group.rotateOnWorldAxis(
-            new THREE.Vector3(0, 1, 0),
-            10 * delta * exponential
-          );
+        // dist, startvalue, startvalue + endvalue, endDist
+        ease = easeFunc(cameraDist - 1, 0, 1, 40);
+
+        trackballControls.zoomSpeed = ease;
+        trackballControls.rotateSpeed = ease;
+        trackballControls.update();
+
+        const newDist = distance(vec3ToArray(camera.position), [0, 0, 0]);
+        if (newDist < 1.00002) {
+          camera.position.set(...oldPos);
+          camera.rotation.set(...oldRot);
         }
-        if (keyboard.pressed("down")) {
-          group.rotateOnWorldAxis(
-            new THREE.Vector3(1, 0, 0),
-            10 * delta * exponential
-          );
-        } else if (keyboard.pressed("up")) {
-          group.rotateOnWorldAxis(
-            new THREE.Vector3(1, 0, 0),
-            -10 * delta * exponential
-          );
-        }
-
-        camera.position.z -= mouseSpeed * delta * exponential * 2;
-
-        if (camera.position.z < 1.001) camera.position.z = 1.001;
-        else if (camera.position.z > 60) camera.position.z = 60;
-        if (mouseSpeed < -0.1) mouseSpeed += 0.1;
-        else if (mouseSpeed > 0.1) mouseSpeed -= 0.1;
-        else mouseSpeed = 0;
       }
 
-      function onMouseWheel(event) {
-        event.preventDefault();
-        const mouseDelta = -event.deltaY / 150;
-        // console.log(mouseDelta);
-        if (
-          (mouseDelta > 0 && mouseSpeed < 0) ||
-          (mouseDelta < 0 && mouseSpeed > 0)
-        ) {
-          mouseSpeed = 0;
-        }
-        mouseSpeed += mouseDelta;
+      function easeFunc(t, b, c, d) {
+        // t /= d;
+        // return b + c * t;
+        var ts = (t /= d) * t;
+        var tc = ts * t;
+        return (
+          b +
+          c *
+            (2.3 * tc * ts +
+              -8.835 * ts * ts +
+              13.67 * tc +
+              -10.87 * ts +
+              4.735 * t)
+        );
       }
 
       function onWindowResize() {

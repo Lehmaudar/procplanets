@@ -320,6 +320,7 @@ function LOD(
   tessZoomIn,
   tessZoomOut
 ) {
+  // icosphere.geometry.computeVertexNormals();
   if (counter % 600 == 0) {
     // console.log(distCalcs, lenCalcs, counter);
     distCalcs = 0;
@@ -424,6 +425,7 @@ function LODold(
   tessZoomIn,
   tessZoomOut
 ) {
+  // icosphere.geometry.computeVertexNormals();
   if (counter % 600 == 0) {
     // console.log(distCalcs, lenCalcs, counter);
     distCalcs = 0;
@@ -585,6 +587,13 @@ function distance(posA, posB) {
   const x = posA[0] - posB[0];
   const y = posA[1] - posB[1];
   const z = posA[2] - posB[2];
+  return Math.sqrt(x * x + y * y + z * z);
+}
+
+function vecDistance(vecA, vecB) {
+  const x = vecA.x - vecB.x;
+  const y = vecA.y - vecB.y;
+  const z = vecA.z - vecB.z;
   return Math.sqrt(x * x + y * y + z * z);
 }
 
