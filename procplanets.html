@@ -16,6 +16,7 @@
     <script src="http://threejs.org/examples/js/controls/TrackballControls.js"></script> -->
 
     <!-- External libraries from local machine -->
+    <script type="text/javascript" src="js/external/simplex-noise.js"></script>
     <script type="text/javascript" src="js/external/three.r96.js"></script>
     <script type="text/javascript" src="js/external/stats.min.js"></script>
     <script type="text/javascript" src="js/external/dat.gui.min.js"></script>
@@ -26,7 +27,7 @@
     ></script>
     <script
       type="text/javascript"
-      src="js/external/threex.keyboardstate.js"
+      src="js/external/THREEx.KeyboardState.js"
     ></script>
 
     <!-- Project js files -->
@@ -54,6 +55,7 @@
       let zoomSpeed;
       var clock = new THREE.Clock();
       var keyboard = new THREEx.KeyboardState();
+      var simplex = new SimplexNoise();
 
       init();
       var variables = datGui();
@@ -62,11 +64,11 @@
       // dat.gui ui
       function datGui() {
         var Variables = function() {
-          this.spinSpeed = 0.0;
-          this.tessConstant = 0.1;
-          this.tessGive = 0.01;
-          this.tessZoomIn = true;
-          this.tessZoomOut = true;
+          // this.spinSpeed = 0.0;
+          this.tessConstant = 25;
+          this.tessGive = 1;
+          this.tessZoomIn = false;
+          this.tessZoomOut = false;
           this.wireframe = false;
           this.addDetail = function() {
             addDetail();
@@ -90,9 +92,9 @@
         // folder1.open();
         folder2.open();
         // folder3.open();
-        folder1.add(variables, "spinSpeed", 0, 2);
-        folder2.add(variables, "tessConstant", 0.0005, 0.2);
-        folder2.add(variables, "tessGive", 0, 0.1);
+        // folder1.add(variables, "spinSpeed", 0, 2);
+        folder2.add(variables, "tessConstant", 0.01, 25);
+        folder2.add(variables, "tessGive", 0, 10);
         folder2.add(variables, "tessZoomIn");
         folder2.add(variables, "tessZoomOut");
         folder2.add(variables, "useTreeStruc");
@@ -154,12 +156,12 @@
 
         // put a camera in the scene
         camera = new THREE.PerspectiveCamera(
-          35,
+          15,
           window.innerWidth / window.innerHeight,
-          0.00001,
+          0.0001,
           10000
         );
-        camera.position.set(0, 0, 5);
+        camera.position.set(0, 0, 15);
         scene.add(camera);
 
         // create a camera contol
@@ -207,16 +209,16 @@
         if (variables.useTreeStruc) {
           LOD(
             camera.position,
-            variables.tessConstant,
-            variables.tessGive,
+            variables.tessConstant / 100,
+            variables.tessGive / 30,
             variables.tessZoomIn,
             variables.tessZoomOut
           );
         } else {
           LODold(
             camera.position,
-            variables.tessConstant,
-            variables.tessGive,
+            variables.tessConstant / 100,
+            variables.tessGive / 30,
             variables.tessZoomIn,
             variables.tessZoomOut
           );
@@ -227,38 +229,60 @@
       }
 
       function smootherControls() {
-        const oldPos = vec3ToArray(camera.position);
-        const oldRot = vec3ToArray(camera.rotation);
-        const cameraDist = distance(oldPos, [0, 0, 0]);
+        const oldCameraPos = vec3ToArray(camera.position);
+        const oldCameraRot = vec3ToArray(camera.rotation);
+        const oldCameraDist = distance(oldCameraPos, [0, 0, 0]);
+
+        const oldTargetPos = vec3ToArray(trackballControls.target);
+        const oldTargetDist = distance(oldTargetPos, [0, 0, 0]);
 
         // dist, startvalue, startvalue + endvalue, endDist
-        ease = easeFunc(cameraDist - 1, 0, 1, 40);
+        ease = easeFunc(oldCameraDist - 1, 0, 1, 40);
 
         trackballControls.zoomSpeed = ease;
-        trackballControls.rotateSpeed = ease;
+        trackballControls.rotateSpeed = ease * 2;
+        trackballControls.panSpeed = ease / 5;
+
         trackballControls.update();
 
-        const newDist = distance(vec3ToArray(camera.position), [0, 0, 0]);
-        if (newDist < 1.00002) {
-          camera.position.set(...oldPos);
-          camera.rotation.set(...oldRot);
+        const newCameraDist = distance(vec3ToArray(camera.position), [0, 0, 0]);
+        if (newCameraDist < 1.00002) {
+          camera.position.set(...oldCameraPos);
+          camera.rotation.set(...oldCameraRot);
         }
+
+        const newTargetDist = distance(vec3ToArray(trackballControls.target), [
+          0,
+          0,
+          0
+        ]);
+        // console.log(newTargetDist);
+        if (newTargetDist > 1.00002) {
+          // trackballControls.target.set(...oldTargetPos);
+          trackballControls.target.normalize();
+        }
+        // console.log(distance(vec3ToArray(trackballControls.target), [0, 0, 0]));
       }
 
       function easeFunc(t, b, c, d) {
         // t /= d;
         // return b + c * t;
+
+        // var ts = (t /= d) * t;
+        // var tc = ts * t;
+        // return (
+        //   b +
+        //   c *
+        //     (2.3 * tc * ts +
+        //       -8.835 * ts * ts +
+        //       13.67 * tc +
+        //       -10.87 * ts +
+        //       4.735 * t)
+        // );
+
         var ts = (t /= d) * t;
         var tc = ts * t;
-        return (
-          b +
-          c *
-            (2.3 * tc * ts +
-              -8.835 * ts * ts +
-              13.67 * tc +
-              -10.87 * ts +
-              4.735 * t)
-        );
+        return b + c * (-1 * ts * ts + 4 * tc + -6 * ts + 4 * t);
       }
 
       function onWindowResize() {
