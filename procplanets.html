@@ -5,7 +5,8 @@
     <meta charset="utf-8" />
     <meta
       name="viewport"
-      content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0"
+      content="width=device-width, user-scalable=no, minimum-scale=1.0,
+      maximum-scale=1.0"
     />
 
     <!-- External libraries from the web -->
@@ -14,7 +15,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.7.5/dat.gui.min.js"></script>
     <script src="http://wzrd.in/standalone/uuid%2Fv1@latest"></script>
     <script src="http://threejs.org/examples/js/controls/TrackballControls.js"></script> -->
-
     <!-- External libraries from local machine -->
     <script type="text/javascript" src="js/external/simplex-noise.js"></script>
     <script type="text/javascript" src="js/external/three.r96.js"></script>
@@ -27,8 +27,14 @@
     ></script>
     <script
       type="text/javascript"
+      src="js/external/PointerLockControls.js"
+    ></script>
+
+    <script
+      type="text/javascript"
       src="js/external/THREEx.KeyboardState.js"
     ></script>
+    <script type="text/javascript" src="js/external/Tween.js"></script>
 
     <!-- Project js files -->
     <script type="text/javascript" src="js/icosphere.js"></script>
@@ -57,6 +63,16 @@
       var keyboard = new THREEx.KeyboardState();
       var simplex = new SimplexNoise();
 
+      var trackballControls;
+      var pointerLockControls;
+      var raycaster = new THREE.Raycaster();
+      var mouse = new THREE.Vector2();
+      var pointer;
+      var onGround = false;
+      var skyPos = new THREE.Vector3();
+      var target = new THREE.Vector3(3, -6, 6); // create on init
+      var downTween, upTween;
+
       init();
       var variables = datGui();
       animate();
@@ -65,7 +81,7 @@
       function datGui() {
         var Variables = function() {
           // this.spinSpeed = 0.0;
-          this.tessConstant = 25;
+          this.tessConstant = 4;
           this.tessGive = 1;
           this.tessZoomIn = false;
           this.tessZoomOut = false;
@@ -158,7 +174,7 @@
         camera = new THREE.PerspectiveCamera(
           15,
           window.innerWidth / window.innerHeight,
-          0.0001,
+          0.001,
           10000
         );
         camera.position.set(0, 0, 15);
@@ -177,6 +193,98 @@
         group = new THREE.Object3D();
         group.add(icosphere);
         scene.add(group);
+
+        // Raycaster
+        raycaster = new THREE.Raycaster();
+        window.addEventListener("mousemove", onMouseMove, false);
+        pointer = new THREE.Mesh(
+          new THREE.SphereGeometry(0.03, 8, 8),
+          new THREE.MeshBasicMaterial({ color: 0xff0000 })
+        );
+        mover = new THREE.Mesh(
+          new THREE.SphereGeometry(0.06, 8, 8),
+          new THREE.MeshBasicMaterial({ color: 0x0000ff })
+        );
+        scene.add(pointer);
+        scene.add(mover);
+
+        var downTween = new TWEEN.Tween(camera.position)
+          .to(new THREE.Vector3().copy(pointer.position), 3000)
+          .easing(TWEEN.Easing.Quadratic.InOut)
+          .onComplete(() => {});
+
+        document.body.onkeyup = e => {
+          if (e.keyCode == 70) {
+            var frustum = new THREE.Frustum();
+            frustum.setFromMatrix(
+              new THREE.Matrix4().multiplyMatrices(
+                camera.projectionMatrix,
+                camera.matrixWorldInverse
+              )
+            );
+
+            geom.computeFaceNormals();
+            var cameraVector = new THREE.Vector3(0, 0, -1).applyQuaternion(
+              camera.quaternion
+            );
+
+            faceCache
+              .filter(face => face.isRendered)
+              .forEach(face => {
+                let inFrustum = false;
+                face.cacheVertices.forEach(vertexId => {
+                  let vertex = vertexCache[vertexId];
+                  let pos = vertex.normalized
+                    ? vertex.normalizedPos
+                    : vertex.originalPos;
+                  if (frustum.containsPoint(arrayToVec3(pos))) inFrustum = true;
+                });
+                // console.log(inFrustum);
+                // if (inFrustum) markFace(face);
+
+                let frontSide = false;
+                var normalVector = geom.faces[
+                  face.geometryIndex
+                ].normal.applyQuaternion(icosphere.quaternion);
+                if (normalVector.angleTo(cameraVector) > Math.PI / 2)
+                  frontSide = true;
+                if (frontSide) markFace(face);
+
+                geom.colorsNeedUpdate = true;
+              });
+          }
+
+          if (e.keyCode == 32) {
+            if (onGround) {
+              onGround = false;
+              if (downTween != undefined) downTween.stop();
+              upTween = new TWEEN.Tween(camera.position)
+                .to(new THREE.Vector3().copy(skyPos), 3000)
+                .easing(TWEEN.Easing.Quadratic.InOut)
+                .onComplete(() => {
+                  trackballControls.enabled = true;
+                });
+              upTween.start();
+            } else {
+              onGround = true;
+              if (upTween == undefined || !upTween._isPlaying) {
+                skyPos.copy(camera.position);
+              }
+              if (upTween != undefined) upTween.stop();
+              trackballControls.enabled = false;
+              downTween = new TWEEN.Tween(camera.position)
+                .to(new THREE.Vector3().copy(pointer.position), 3000)
+                .easing(TWEEN.Easing.Quadratic.InOut)
+                .onComplete(() => {});
+              downTween.start();
+            }
+          }
+        };
+      }
+
+      function onMouseMove(event) {
+        mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
       }
 
       // animation loop
@@ -185,13 +293,25 @@
         delta = clock.getDelta();
 
         // update camera controls
-        if (variables.smootherControls) {
+        if (trackballControls.enabled) {
           smootherControls(delta);
-        } else {
-          trackballControls.update();
         }
 
-        // console.log(camera.position);
+        raycaster.setFromCamera(mouse, camera);
+        var intersects = raycaster.intersectObjects([icosphere]);
+        if (intersects.length == 0) {
+          pointer.position.set(0, 0, 0);
+        } else {
+          for (var i = 0; i < intersects.length; i++) {
+            const index = intersects[i].faceIndex;
+            const cacheFace = faceCache.filter(
+              face => face.geometryIndex == index
+            )[0];
+            pointer.position.set(...multiplyPos(cacheFace.middlePos, 1.05));
+          }
+        }
+
+        TWEEN.update();
 
         // focus on canvas in case gui has been pressed
         renderer.domElement.setAttribute("tabIndex", "0");
@@ -256,30 +376,12 @@
           0,
           0
         ]);
-        // console.log(newTargetDist);
         if (newTargetDist > 1.00002) {
-          // trackballControls.target.set(...oldTargetPos);
           trackballControls.target.normalize();
         }
-        // console.log(distance(vec3ToArray(trackballControls.target), [0, 0, 0]));
       }
 
       function easeFunc(t, b, c, d) {
-        // t /= d;
-        // return b + c * t;
-
-        // var ts = (t /= d) * t;
-        // var tc = ts * t;
-        // return (
-        //   b +
-        //   c *
-        //     (2.3 * tc * ts +
-        //       -8.835 * ts * ts +
-        //       13.67 * tc +
-        //       -10.87 * ts +
-        //       4.735 * t)
-        // );
-
         var ts = (t /= d) * t;
         var tc = ts * t;
         return b + c * (-1 * ts * ts + 4 * tc + -6 * ts + 4 * t);

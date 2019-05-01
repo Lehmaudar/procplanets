@@ -1,6 +1,10 @@
 # Don't track content of these folders
 js/external
+tests
 
 # Don't track these files
 procplanets.1.html
 procplanets.2.html
+procplanets-fly.html
+procplanets-key.html
+icosphere.2.js

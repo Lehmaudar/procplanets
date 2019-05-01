@@ -20,19 +20,10 @@ function noise(position) {
     maxHeight += layer[1];
   });
   value /= maxHeight;
-  // console.log(maxHeight);
-
-  // value *= 0.6;
   if (value < waterLevel) value = waterLevel;
 
-  // v.z += noisefn(x * 0.003, y * 0.002) * heightScale + 6;
-  // v.z += noisefn(x * 0.005, y * 0.005) * (heightScale / 2);
-  // v.z += noisefn(x * 0.010, y * 0.010) * (heightScale / 4);
-  // v.z += noisefn(x * 0.03, y * 0.03) * 2;
-  // v.z += noisefn(x * 0.1, y * 0.1) * 0.7;
-  // v.z *= 3;
-
-  // console.log(value);
+  value += 0.1;
+  value /= 1.1;
   return value;
 }
 
@@ -126,9 +117,12 @@ function icosphere() {
   // addDetail();
   // addDetail();
   // addDetail();
+  // undivCacheFace(faceCache[0]);
+  // [24, 25, 26].forEach(id => markFace(faceCache[id]));
+  // reColorFace(faceCache[1]);
 
-  subdivCacheFace(faceCache[0]);
-  subdivCacheFace(faceCache[1]);
+  // subdivCacheFace(faceCache[0]);
+  // subdivCacheFace(faceCache[1]);
 
   // additional mesh with different material
   geom.computeVertexNormals();
@@ -136,8 +130,6 @@ function icosphere() {
   helpIcosphere = new THREE.Mesh(geom, helpMat);
   helpIcosphere.name = "helpIcosphere";
   // scene.add(helpIcosphere);
-
-  // reColorFace(faceCache[0]);
 }
 
 function createVertex(
@@ -171,7 +163,6 @@ function createVertex(
       (vertexCache[parentVerts[0]].normalizedNoise +
         vertexCache[parentVerts[1]].normalizedNoise) /
       2;
-    // console.log(originalNoise);
     normalizedPos = undefined;
     normalized = false;
     originalPos = position;
@@ -210,50 +201,19 @@ function createFace(cacheVertices, parent) {
     depth = faceCache[parent].depth + 1;
   }
 
-  // const colorT = depth / 4;
-  // let colors = [];
-  // colors.push(Math.random() - 0.6 + 0.6 * colorT);
-  // colors.push(Math.random() + 0.3 - 0.3 * colorT);
-  // colors.push(Math.random() + 0.3 - 0.3 * colorT);
-  // for (let i = 0; i < 3; i++) {
-  //   if (colors[i] >= 1) colors[i] = Math.random() * 0.1 + 0.9;
-  //   if (colors[i] <= 0) colors[i] = Math.random() * 0.1;
-  // }
-  // face.color.setRGB(...colors);
-
-  // let value = (noise(middlePos) + 1) / 2;
-  // value -= 0.4;
-  // value *= 5;
-  // // console.log(waterLevel);
-  // // console.log(value, ((waterLevel + 1) / 2 - 0.4) * 5);
-  // if (value === ((waterLevel + 1) / 2 - 0.4) * 5) {
-  //   face.color.setRGB(value * 0.95, value * 0.95, value);
-  // } else face.color.setRGB(value, value, value);
-
   for (let i = 0; i < 3; i++) {
     const cacheVertex = vertexCache[cacheVertices[i]];
     let height = 99;
-    // height =
-    //   distance(vec3ToArray(geom.vertices[cacheVertex.geometryIndex]), [
-    //     0,
-    //     0,
-    //     0
-    //   ]) - 1;
-    // face.vertexColors[i].setRGB(height, height, height);
-
-    // if (cacheVertex.normalized) {
-    //   height = distance(cacheVertex.normalizedPos, [0, 0, 0]) - 1;
-    // } else {
-    //   height = distance(cacheVertex.originalPos, [0, 0, 0]) - 1;
-    // }
-    // face.vertexColors[i].setRGB(height, height, height);
-
     if (cacheVertex.normalized) {
       height = cacheVertex.normalizedNoise;
     } else {
       height = cacheVertex.originalNoise;
     }
-    face.vertexColors[i].setRGB(height, height, height);
+    face.vertexColors[i].setRGB(
+      height * 0.8 + 0.1,
+      height + 0.1,
+      height * 0.7 + 0.1
+    );
   }
 
   face.isFree = false;
@@ -285,14 +245,6 @@ function addDetail() {
         subdivCacheFace(face);
       }
     });
-
-  // faceCache
-  //   .filter(face => face.isRendered)
-  //   .forEach(face => {
-  //     if (face.isRendered) {
-  //       reColorFace(face);
-  //     }
-  //   });
 }
 
 function removeDetail() {
@@ -300,7 +252,6 @@ function removeDetail() {
     .filter(
       cacheFace =>
         !cacheFace.isRendered &&
-        // cacheFace.geometryIndex == undefined &&
         cacheFace.children.length != 0 &&
         faceCache[cacheFace.children[0]].isRendered &&
         faceCache[cacheFace.children[1]].isRendered &&
@@ -338,51 +289,30 @@ function subdivCacheFace(cacheFace) {
       createFace([ab, bc, ca], parentIndex)
     ];
 
-    // if ()
     const newVertices = [ab, bc, ca];
     newVertices.forEach(vertexId => {
-      console.log(vertexCache[vertexId].parentFaceB[1]);
-      console.log(vertexCache[vertexId].parentFaceB[0]);
-      console.log(vertexCache[vertexId]);
       if (vertexCache[vertexId].parentFaceB[1]) {
         const parentB = faceCache[vertexCache[vertexId].parentFaceA[0]];
         parentB.children.forEach(childIndex => {
-          console.log("asd");
           reColorFace(faceCache[childIndex]);
         });
       }
     });
-
-    // if (vertexCache[ab].parentFaceB[1]) {
-    //   const parentB = faceCache[vertexCache[ab].parentFaceB[0]];
-    //   parentB.children.forEach(childIndex => {
-    //     console.log("asd");
-    //     reColorFace(faceCache[childIndex]);
-    //   });
-    // }
-
-    // console.log(faceCache[vertexCache[ab].parentFaceB[0]].children);
-    // faceCache[cacheVertex.parentFaceA[0]].children.forEach(childIndex => {
-    //   console.log("asd");
-    //   reColorFace(faceCache[childIndex]);
-    // });
-
-    // cacheFace.children.forEach(childIndex => {
-    //   // console.log("asd");
-    //   reColorFace(faceCache[childIndex]);
-    // });
   } else {
     removeCacheFace(cacheFace);
 
     cacheFace.children.forEach(childIndex => {
       addCacheFace(faceCache[childIndex]);
       reColorFace(faceCache[childIndex]);
+      // markFace(faceCache[childIndex]);
+      // console.log("asd");
     });
   }
+
+  // console.log(geom.faces.filter(face => !face.isFree));
 }
 
 function increaseTreeDepth(cacheFace) {
-  // console.log("increaseTreeDepth");
   const cacheParent = faceCache[cacheFace.parent];
   if (cacheParent != undefined && cacheFace.maxDepth > cacheParent.maxDepth) {
     cacheParent.maxDepth = cacheFace.maxDepth;
@@ -400,7 +330,13 @@ function increaseTreeDepth(cacheFace) {
 }
 
 function undivCacheFace(cacheFace) {
+  let vertices = new Set();
   cacheFace.children.forEach(childIndex => {
+    if (faceCache[childIndex].isRendered)
+      faceCache[childIndex].cacheVertices.forEach(vertex => {
+        vertices.add(vertex);
+      });
+
     removeCacheFace(faceCache[childIndex]);
   });
 
@@ -408,6 +344,21 @@ function undivCacheFace(cacheFace) {
   cacheFace.maxDepth = cacheFace.depth;
   lowerTreeDepth(cacheFace);
   addCacheFace(cacheFace);
+
+  faceCache
+    .filter(face => {
+      hasVert = false;
+      [...vertices].forEach(vertex => {
+        if (face.isRendered && face.cacheVertices.includes(vertex))
+          hasVert = true;
+      });
+
+      return hasVert;
+    })
+    .forEach(face => reColorFace(face));
+  // .forEach(face => markFace(face));
+
+  reColorFace(cacheFace);
 }
 
 function lowerTreeDepth(cacheFace) {
@@ -444,15 +395,6 @@ function midPoint(idA, idB, cacheFaceIndex) {
     const cacheVertex = sameParents[0];
     cacheVertex.parentFaceB = [cacheFaceIndex, true];
     normalizeVertex(cacheVertex);
-
-    console.log("asdasdasd");
-
-    // console.log(faceCache[cacheVertex.parentFaceB[0]].children);
-    // faceCache[cacheVertex.parentFaceA[0]].children.forEach(childIndex => {
-    //   console.log("asd");
-    //   reColorFace(faceCache[childIndex]);
-    // });
-
     return cacheVertex.cacheIndex;
   }
 
@@ -488,8 +430,6 @@ function LOD(
   counter += 1;
   const cameraPos = vec3ToArray(cameraPosVec);
 
-  // console.log(distance(cameraPos, [0, 0, 0]));
-
   for (let i = 0; i < 20; i++) {
     const startFace = faceCache[i];
 
@@ -517,8 +457,6 @@ function LODRek(
   let pos = 0;
   pos = cacheFace.middlePos;
   pos = vec3ToArray(group.localToWorld(arrayToVec3(pos)));
-  // console.log(vec3ToArray(group.localToWorld(arrayToVec3(pos))));
-  // console.log(arrayToVec3(pos), group.localToWorld(arrayToVec3(pos)));
   const faceDist = distance(cameraPos, pos);
   const minDepthEdgeLenghtView = Math.pow(0.5, cacheFace.minDepth) / faceDist;
   const maxDepthEdgeLenghtView =
@@ -674,7 +612,7 @@ function removeCacheFace(cacheFace) {
   geomFace.c = 0;
   cacheFace.geometryIndex = undefined;
   // TODO: isFree tagasi
-  // geomFace.isFree = true;
+  geomFace.isFree = true;
   // TODO: kui neid enam ei renderdata siis ei pea vist abc muutma
 }
 
@@ -794,20 +732,8 @@ function arrayToVec3(array) {
 
 function reColorFace(cacheFace) {
   const face = geom.faces[cacheFace.geometryIndex];
-  // console.log("");
-  // console.log(cacheFace);
-  // console.log(face);
-  // console.log(cacheFace.cacheIndex);
-
   for (let i = 0; i < 3; i++) {
     const cacheVertex = vertexCache[cacheFace.cacheVertices[i]];
-
-    // if (cacheVertex.normalized) {
-    //   height = distance(cacheVertex.normalizedPos, [0, 0, 0]) - 1;
-    // } else {
-    //   height = distance(cacheVertex.originalPos, [0, 0, 0]) - 1;
-    // }
-    // face.vertexColors[i].setRGB(1, 0, 0);
 
     if (cacheVertex.normalized) {
       height = cacheVertex.normalizedNoise;
@@ -816,9 +742,19 @@ function reColorFace(cacheFace) {
       height = cacheVertex.originalNoise;
       // console.log("NOT Normalized: ", cacheFace.cacheVertices[i]);
     }
-    face.vertexColors[i].setRGB(height, height, height);
+    face.vertexColors[i].setRGB(
+      height * 0.8 + 0.1,
+      height + 0.1,
+      height * 0.7 + 0.1
+    );
+
     // face.vertexColors[i].setRGB(1, 0, 0);
   }
+}
 
-  // geom.colorsNeedUpdate = true;
+function markFace(cacheFace) {
+  const face = geom.faces[cacheFace.geometryIndex];
+  for (let i = 0; i < 3; i++) {
+    face.vertexColors[i].setRGB(0, 0, 1);
+  }
 }
