@@ -75,6 +75,7 @@
 
       var frustum = new THREE.Frustum();
       var cameraVector = new THREE.Vector3();
+      var colorsNeedUpdate = false;
 
       var t1, t0;
 
@@ -86,18 +87,31 @@
       function datGui() {
         var Variables = function() {
           // this.spinSpeed = 0.0;
-          this.tessConstant = 1;
-          this.tessGive = 0.3;
+          this.tessConstant = 2;
+          this.tessGive = 0.5;
           this.tessZoomIn = false;
           this.tessZoomOut = false;
           this.wireframe = false;
           this.addDetail = function() {
-            addDetail();
+            t0 = performance.now();
+            addDetail(faceCache);
             icosphere.geometry.elementsNeedUpdate = true;
+            t1 = performance.now();
+            console.log("AddDetail took " + (t1 - t0) + " milliseconds.");
+          };
+          this.addDetailOptimized = function() {
+            t0 = performance.now();
+            addDetail(findVisibleFaces(faceCache));
+            icosphere.geometry.elementsNeedUpdate = true;
+            t1 = performance.now();
+            console.log("AddDetail took " + (t1 - t0) + " milliseconds.");
           };
           this.removeDetail = function() {
+            t0 = performance.now();
             removeDetail();
             icosphere.geometry.elementsNeedUpdate = true;
+            t1 = performance.now();
+            console.log("RemoveDetail took " + (t1 - t0) + " milliseconds.");
           };
           this.vertexColors = true;
           this.useTreeStruc = false;
@@ -120,6 +134,7 @@
         folder2.add(variables, "tessZoomOut");
         folder2.add(variables, "useTreeStruc");
         folder2.add(variables, "addDetail");
+        folder2.add(variables, "addDetailOptimized");
         folder2.add(variables, "removeDetail");
         var wireframe = folder1.add(variables, "wireframe");
         var vertexColors = folder1.add(variables, "vertexColors");
@@ -204,11 +219,14 @@
         window.addEventListener("mousemove", onMouseMove, false);
         pointer = new THREE.Mesh(
           new THREE.SphereGeometry(0.03, 8, 8),
-          new THREE.MeshBasicMaterial({ color: 0xff0000 })
+          new THREE.MeshBasicMaterial({ color: 0xffffff })
         );
+        pointer.material.color.setRGB(0.9, 0.9, 0.9);
         mover = new THREE.Mesh(
-          new THREE.SphereGeometry(0.06, 8, 8),
-          new THREE.MeshBasicMaterial({ color: 0x0000ff })
+          new THREE.SphereGeometry(0.03, 8, 8),
+          new THREE.MeshBasicMaterial({
+            color: 0x0000ff
+          })
         );
         scene.add(pointer);
         scene.add(mover);
@@ -230,10 +248,16 @@
           }
 
           if (e.keyCode == 83) {
-            subdivCacheFace(faceCache[1]);
-            geom.computeVertexNormals();
-            // addDetail();
-            icosphere.geometry.elementsNeedUpdate = true;
+            t0 = performance.now();
+            for (let i = 0; i < 500; i++) {
+              findVisibleFaces(faceCache);
+            }
+            t1 = performance.now();
+            console.log(
+              "FindVisibleFaces took " + (t1 - t0) + " milliseconds."
+            );
+
+            // upDateColors();
           }
 
           // subdivCacheFace(faceCache[1]);
@@ -241,6 +265,7 @@
           if (e.keyCode == 32) {
             if (onGround) {
               onGround = false;
+              pointer.material.color.setRGB(0.9, 0.9, 0.9);
               if (downTween != undefined) downTween.stop();
               upTween = new TWEEN.Tween(camera.position)
                 .to(new THREE.Vector3().copy(skyPos), 3000)
@@ -249,13 +274,18 @@
                   trackballControls.enabled = true;
                 });
               upTween.start();
-            } else {
+            } else if (
+              pointer.position.x != 0 &&
+              pointer.position.y != 0 &&
+              pointer.position.x != 0
+            ) {
               onGround = true;
               if (upTween == undefined || !upTween._isPlaying) {
                 skyPos.copy(camera.position);
               }
               if (upTween != undefined) upTween.stop();
               trackballControls.enabled = false;
+              pointer.material.color.setRGB(0.7, 0.9, 0.7);
               downTween = new TWEEN.Tween(camera.position)
                 .to(new THREE.Vector3().copy(pointer.position), 3000)
                 .easing(TWEEN.Easing.Quadratic.InOut)
@@ -288,16 +318,18 @@
         }
 
         raycaster.setFromCamera(mouse, camera);
-        var intersects = raycaster.intersectObjects([icosphere]);
+        var intersects = raycaster.intersectObject(icosphere);
         if (intersects.length == 0) {
           pointer.position.set(0, 0, 0);
         } else {
           for (var i = 0; i < intersects.length; i++) {
-            const index = intersects[i].faceIndex;
-            const cacheFace = faceCache.filter(
-              face => face.geometryIndex == index
-            )[0];
-            pointer.position.set(...multiplyPos(cacheFace.middlePos, 1.05));
+            // const index = intersects[i].faceIndex;
+            // const cacheFace = faceCache.filter(
+            //   face => face.geometryIndex == index
+            // )[0];
+            // pointer.position.set(...multiplyPos(cacheFace.middlePos, 1.05));
+            const point = intersects[i].point;
+            pointer.position.set(...multiplyPos(vec3ToArray(point), 1.05));
           }
         }
 
@@ -316,7 +348,6 @@
         // variable which is increase by Math.PI every seconds - usefull for animation
         var PIseconds = Date.now() * Math.PI;
 
-        // var t0 = performance.now();
         if (variables.useTreeStruc) {
           LOD(
             camera.position,
@@ -334,10 +365,8 @@
             variables.tessZoomOut
           );
         }
-        // var t1 = performance.now();
-        // console.log("Call to doSomething took " + (t1 - t0) + " milliseconds.");
+        if (colorsNeedUpdate) upDateColors();
 
-        // actually render the scene
         renderer.render(scene, camera);
       }
 

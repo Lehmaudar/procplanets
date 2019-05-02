@@ -113,17 +113,19 @@ function icosphere() {
   scene.add(icosphere);
 
   // addDetail();
-  markFace(faceCache[0], [0, 1, 0]);
-  subdivCacheFace(faceCache[0]);
-  // subdivCacheFace(faceCache[1]);
-  let testFaces;
-  // testFaces = [20, 21, 22, 23];
-  testFaces = [20];
-  testFaces.forEach(index => {
-    // markFace(faceCache[index]);
-    subdivCacheFace(faceCache[index]);
-  });
-  icosphere.geometry.elementsNeedUpdate = true;
+  // removeDetail();
+
+  // markFace(faceCache[0], [0, 1, 0]);
+  // subdivCacheFace(faceCache[0]);
+  // // subdivCacheFace(faceCache[1]);
+  // let testFaces;
+  // // testFaces = [20, 21, 22, 23];
+  // testFaces = [20];
+  // testFaces.forEach(index => {
+  //   // markFace(faceCache[index]);
+  //   subdivCacheFace(faceCache[index]);
+  // });
+  // icosphere.geometry.elementsNeedUpdate = true;
 
   // additional mesh with different material
   geom.computeVertexNormals();
@@ -250,14 +252,19 @@ function createFace(cacheVertices, parent) {
   return cacheIndex;
 }
 
-function addDetail() {
-  faceCache
+function addDetail(faces) {
+  // t0 = performance.now();
+
+  faces
     .filter(face => face.isRendered)
     .forEach(face => {
       if (face.isRendered) {
         subdivCacheFace(face);
       }
     });
+
+  // t1 = performance.now();
+  // console.log("AddDetail took " + (t1 - t0) + " milliseconds.");
 }
 
 function removeDetail() {
@@ -274,7 +281,6 @@ function removeDetail() {
     .forEach(cacheFace => {
       undivCacheFace(cacheFace);
     });
-  removeWeirdFaces();
 }
 
 function subdivCacheFace(cacheFace) {
@@ -303,17 +309,25 @@ function subdivCacheFace(cacheFace) {
       createFace([ab, bc, ca], parentIndex)
     ];
 
+    // [ab, bc, ca].forEach(vertexId => {
+    //   if (vertexCache[vertexId].parentFaceB[1]) {
+    //     const parentB = faceCache[vertexCache[vertexId].parentFaceA[0]];
+    //     parentB.children.forEach(childIndex => {
+    //       reColorFace(faceCache[childIndex]);
+    //     });
+    //   }
+    // });
+
     [ab, bc, ca].forEach(vertexId => {
       if (vertexCache[vertexId].parentFaceB[1]) {
         const parentA = faceCache[vertexCache[vertexId].parentFaceA[0]];
-
         parentA.children.forEach(childIndex => {
           const parentAChild = faceCache[childIndex];
 
           if (parentAChild.isRendered) {
-            // TODO: üritasin siin parandada musti auke aga ei õnnestunud
+            // TODO: üritasin siin parandada lõhesid aga ei õnnestunud
             // markFace(parentAChild, [1, 1, 0]);
-            // reColorFace(parentBChild);
+            reColorFace(parentAChild);
             //
           } else if (parentAChild.children.length != 0) {
             parentAChild.children.forEach(childChildIndex => {
@@ -334,7 +348,7 @@ function subdivCacheFace(cacheFace) {
     cacheFace.children.forEach(childIndex => {
       addCacheFace(faceCache[childIndex]);
       reColorFace(faceCache[childIndex]);
-      // markFace(faceCache[childIndex]);
+      // markFace(faceCache[childIndex], [0, 0, 1]);
     });
   }
 }
@@ -357,14 +371,19 @@ function increaseTreeDepth(cacheFace) {
 }
 
 function undivCacheFace(cacheFace) {
-  let vertices = new Set();
+  console.log("ASDSADSSD");
+  // SIMPLE RECOLOR
+  // let vertices = new Set();
   cacheFace.children.forEach(childIndex => {
-    if (faceCache[childIndex].isRendered)
-      faceCache[childIndex].cacheVertices.forEach(vertex => {
-        vertices.add(vertex);
-      });
+    const face = faceCache[childIndex];
 
-    removeCacheFace(faceCache[childIndex]);
+    // SIMPLE RECOLOR
+    // if (face.isRendered)
+    //   face.cacheVertices.forEach(vertex => {
+    //     vertices.add(vertex);
+    //   });
+
+    removeCacheFace(face);
   });
 
   cacheFace.minDepth = cacheFace.depth;
@@ -372,17 +391,18 @@ function undivCacheFace(cacheFace) {
   lowerTreeDepth(cacheFace);
   addCacheFace(cacheFace);
 
-  faceCache
-    .filter(face => {
-      hasVert = false;
-      [...vertices].forEach(vertex => {
-        if (face.isRendered && face.cacheVertices.includes(vertex))
-          hasVert = true;
-      });
+  // SIMPLE RECOLOR
+  // faceCache
+  //   .filter(face => {
+  //     hasVert = false;
+  //     [...vertices].forEach(vertex => {
+  //       if (face.isRendered && face.cacheVertices.includes(vertex))
+  //         hasVert = true;
+  //     });
 
-      return hasVert;
-    })
-    .forEach(face => reColorFace(face));
+  //     return hasVert;
+  //   })
+  //   .forEach(face => reColorFace(face));
   // .forEach(face => markFace(face));
 
   reColorFace(cacheFace);
@@ -748,30 +768,60 @@ function arrayToVec3(array) {
 }
 
 function reColorFace(cacheFace) {
-  const face = geom.faces[cacheFace.geometryIndex];
+  // const face = geom.faces[cacheFace.geometryIndex];
+  // markFace(cacheFace, [1, 0, 0]);
+  colorsNeedUpdate = true;
+  return;
+
   for (let i = 0; i < 3; i++) {
     const cacheVertex = vertexCache[cacheFace.cacheVertices[i]];
 
     if (cacheVertex.normalized) {
       height = cacheVertex.normalizedNoise;
-      // console.log("Normalized: ", cacheFace.cacheVertices[i]);
     } else {
       height = cacheVertex.originalNoise;
-      // console.log("NOT Normalized: ", cacheFace.cacheVertices[i]);
     }
 
     if (cacheFace.isRendered == false) {
       throw new Error("MyError: face should be rendered before recoloring it");
     }
 
-    face.vertexColors[i].setRGB(
-      height * 0.8 + 0.1,
-      height + 0.1,
-      height * 0.7 + 0.1
-    );
+    face.vertexColors[i].setRGB(...color(height));
 
-    // face.vertexColors[i].setRGB(1, 0, 0);
+    faceCache
+      .filter(otherFace => otherFace.isRendered)
+      .forEach(otherFace => {
+        for (let j = 0; j < 3; j++) {
+          if (otherFace.cacheVertices[j] == cacheVertex.cacheIndex) {
+            geom.faces[otherFace.geometryIndex].vertexColors[j].setRGB(
+              ...color(height)
+            );
+          }
+        }
+      });
   }
+}
+
+function upDateColors() {
+  faceCache
+    .filter(face => face.isRendered)
+    .forEach(face => simpleReColorFace(face));
+  geom.colorsNeedUpdate = true;
+  colorsNeedUpdate = false;
+}
+
+function simpleReColorFace(cacheFace) {
+  const face = geom.faces[cacheFace.geometryIndex];
+  for (let i = 0; i < 3; i++) {
+    const cacheVertex = vertexCache[cacheFace.cacheVertices[i]];
+    if (cacheVertex.normalized) height = cacheVertex.normalizedNoise;
+    else height = cacheVertex.originalNoise;
+    face.vertexColors[i].setRGB(...color(height));
+  }
+}
+
+function color(height) {
+  return [height * 0.8 + 0.1, height + 0.1, height * 0.7 + 0.1];
 }
 
 function markFace(cacheFace, colorArray) {
@@ -798,28 +848,23 @@ function updateCullingVectors() {
 }
 
 function findVisibleFaces(faceArray) {
-  var visibleFaces = [];
-
-  faceArray
+  return faceArray
     .filter(face => face.isRendered)
-    .forEach(face => {
+    .filter(face => {
+      let frontSide = false;
+      const normalVector = geom.faces[
+        face.geometryIndex
+      ].normal.applyQuaternion(icosphere.quaternion);
+      if (normalVector.angleTo(cameraVector) > Math.PI / 2) frontSide = true;
+      return frontSide;
+    })
+    .filter(face => {
       let inFrustum = false;
       face.cacheVertices.forEach(vertexId => {
         let vertex = vertexCache[vertexId];
         let pos = vertex.normalized ? vertex.normalizedPos : vertex.originalPos;
         if (frustum.containsPoint(arrayToVec3(pos))) inFrustum = true;
       });
-      // if (inFrustum) markFace(face);
-
-      let frontSide = false;
-      var normalVector = geom.faces[face.geometryIndex].normal.applyQuaternion(
-        icosphere.quaternion
-      );
-      if (normalVector.angleTo(cameraVector) > Math.PI / 2) frontSide = true;
-      // if (frontSide) markFace(face);
-
-      if (frontSide && inFrustum) visibleFaces.push(face);
+      return inFrustum;
     });
-
-  return visibleFaces;
 }
