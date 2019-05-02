@@ -176,10 +176,6 @@ function createVertex(
 
     originalNoise = (firstParentNoise + secondParentNoise) / 2;
 
-    if (isNaN(originalNoise) || originalNoise == undefined) {
-      console.log("AAAAAAAAAAAAAAAA");
-    }
-
     normalizedPos = undefined;
     normalized = false;
     originalPos = position;
@@ -285,10 +281,8 @@ function subdivCacheFace(cacheFace) {
   cacheFace.maxDepth += 1;
   cacheFace.minDepth += 1;
   increaseTreeDepth(cacheFace);
-  // console.log("clause");
-  // console.log(cacheFace.children.length);
+
   if (cacheFace.children.length == 0) {
-    // console.log("if");
     const cacheIndex = cacheFace.cacheIndex;
     const parentIndex = cacheFace.cacheIndex;
 
@@ -341,11 +335,8 @@ function subdivCacheFace(cacheFace) {
       addCacheFace(faceCache[childIndex]);
       reColorFace(faceCache[childIndex]);
       // markFace(faceCache[childIndex]);
-      // console.log("asd");
     });
   }
-
-  // console.log(geom.faces.filter(face => !face.isFree));
 }
 
 function increaseTreeDepth(cacheFace) {
@@ -398,7 +389,6 @@ function undivCacheFace(cacheFace) {
 }
 
 function lowerTreeDepth(cacheFace) {
-  // console.log("lowerTreeDepth");
   const cacheParent = faceCache[cacheFace.parent];
   if (
     cacheFace.depth != 0 &&
@@ -431,9 +421,6 @@ function midPoint(idA, idB, cacheFaceIndex) {
     const cacheVertex = sameParents[0];
     cacheVertex.parentFaceB = [cacheFaceIndex, true];
     normalizeVertex(cacheVertex);
-
-    console.log(cacheVertex.cacheIndex);
-    console.log("--+--");
     return cacheVertex.cacheIndex;
   }
 
@@ -446,9 +433,6 @@ function midPoint(idA, idB, cacheFaceIndex) {
     [idA, idB],
     cacheFaceIndex
   );
-
-  console.log(index);
-  console.log("-----");
 
   return index;
 }
@@ -464,11 +448,6 @@ function LOD(
   tessZoomIn,
   tessZoomOut
 ) {
-  // if (counter % 600 == 0) {
-  //   console.log(distCalcs, lenCalcs, counter);
-  //   distCalcs = 0;
-  //   lenCalcs = 0;
-  // }
   counter += 1;
   const cameraPos = vec3ToArray(cameraPosVec);
 
@@ -566,19 +545,11 @@ function LODold(
   tessZoomIn,
   tessZoomOut
 ) {
-  // if (counter % 600 == 0) {
-  //   console.log(distCalcs, lenCalcs, counter);
-  //   distCalcs = 0;
-  //   lenCalcs = 0;
-  // }
   counter += 1;
   const cameraPos = vec3ToArray(cameraPosVec);
-  const meshDist = distance(cameraPos, [0, 0, 0]);
-  // TODO: mby use this for not generating backside
 
   updateFrustum();
   updateCullingVectors();
-  // console.log(findVisibleFaces(faceCache));
   // faceCache
   findVisibleFaces(faceCache)
     .filter(
@@ -629,8 +600,8 @@ function removeWeirdFaces() {
       faceCache[cacheFace.parent] != undefined &&
       faceCache[cacheFace.parent].maxDepth < cacheFace.depth
     ) {
+      throw new Error("MyError: Weird face");
       removeCacheFace(cacheFace);
-      console.log("removeWeirdFaces() REMOVED");
     }
   }
 }
@@ -647,7 +618,6 @@ function findFirstFreeFaceIndex() {
 
 function removeCacheFace(cacheFace) {
   if (cacheFace.isRendered == false) {
-    console.log(cacheFace);
     throw new Error("MyError: face should be rendered before removing it");
   }
 
@@ -791,7 +761,6 @@ function reColorFace(cacheFace) {
     }
 
     if (cacheFace.isRendered == false) {
-      console.log(cacheFace);
       throw new Error("MyError: face should be rendered before recoloring it");
     }
 
