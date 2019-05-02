@@ -113,16 +113,17 @@ function icosphere() {
   scene.add(icosphere);
 
   // addDetail();
-  // addDetail();
-  // addDetail();
-  // addDetail();
-  // addDetail();
-  // undivCacheFace(faceCache[0]);
-  // [24, 25, 26].forEach(id => markFace(faceCache[id]));
-  // reColorFace(faceCache[1]);
-
-  // subdivCacheFace(faceCache[0]);
+  markFace(faceCache[0], [0, 1, 0]);
+  subdivCacheFace(faceCache[0]);
   // subdivCacheFace(faceCache[1]);
+  let testFaces;
+  // testFaces = [20, 21, 22, 23];
+  testFaces = [20];
+  testFaces.forEach(index => {
+    // markFace(faceCache[index]);
+    subdivCacheFace(faceCache[index]);
+  });
+  icosphere.geometry.elementsNeedUpdate = true;
 
   // additional mesh with different material
   geom.computeVertexNormals();
@@ -159,10 +160,26 @@ function createVertex(
     originalPos = normalizedPos;
     originalNoise = normalizedNoise;
   } else {
-    originalNoise =
-      (vertexCache[parentVerts[0]].normalizedNoise +
-        vertexCache[parentVerts[1]].normalizedNoise) /
-      2;
+    let firstParentNoise = undefined;
+    let secondParentNoise = undefined;
+
+    if (vertexCache[parentVerts[0]].normalized)
+      firstParentNoise = vertexCache[parentVerts[0]].normalizedNoise;
+    else firstParentNoise = vertexCache[parentVerts[0]].originalNoise;
+
+    if (vertexCache[parentVerts[1]].normalized)
+      secondParentNoise = vertexCache[parentVerts[1]].normalizedNoise;
+    else secondParentNoise = vertexCache[parentVerts[1]].originalNoise;
+
+    // firstParentNoise = vertexCache[parentVerts[0]].normalizedNoise;
+    // secondParentNoise = vertexCache[parentVerts[1]].normalizedNoise;
+
+    originalNoise = (firstParentNoise + secondParentNoise) / 2;
+
+    if (isNaN(originalNoise) || originalNoise == undefined) {
+      console.log("AAAAAAAAAAAAAAAA");
+    }
+
     normalizedPos = undefined;
     normalized = false;
     originalPos = position;
@@ -268,7 +285,10 @@ function subdivCacheFace(cacheFace) {
   cacheFace.maxDepth += 1;
   cacheFace.minDepth += 1;
   increaseTreeDepth(cacheFace);
+  // console.log("clause");
+  // console.log(cacheFace.children.length);
   if (cacheFace.children.length == 0) {
+    // console.log("if");
     const cacheIndex = cacheFace.cacheIndex;
     const parentIndex = cacheFace.cacheIndex;
 
@@ -289,12 +309,28 @@ function subdivCacheFace(cacheFace) {
       createFace([ab, bc, ca], parentIndex)
     ];
 
-    const newVertices = [ab, bc, ca];
-    newVertices.forEach(vertexId => {
+    [ab, bc, ca].forEach(vertexId => {
       if (vertexCache[vertexId].parentFaceB[1]) {
-        const parentB = faceCache[vertexCache[vertexId].parentFaceA[0]];
-        parentB.children.forEach(childIndex => {
-          reColorFace(faceCache[childIndex]);
+        const parentA = faceCache[vertexCache[vertexId].parentFaceA[0]];
+
+        parentA.children.forEach(childIndex => {
+          const parentAChild = faceCache[childIndex];
+
+          if (parentAChild.isRendered) {
+            // TODO: üritasin siin parandada musti auke aga ei õnnestunud
+            // markFace(parentAChild, [1, 1, 0]);
+            // reColorFace(parentBChild);
+            //
+          } else if (parentAChild.children.length != 0) {
+            parentAChild.children.forEach(childChildIndex => {
+              const childChild = faceCache[childChildIndex];
+              // markFace(childChild, [1, 0, 0]);
+              childChild.cacheVertices.forEach(vertexId => {
+                // normalizeVertex(vertexCache[vertexId]);
+              });
+            });
+            //
+          }
         });
       }
     });
@@ -395,6 +431,9 @@ function midPoint(idA, idB, cacheFaceIndex) {
     const cacheVertex = sameParents[0];
     cacheVertex.parentFaceB = [cacheFaceIndex, true];
     normalizeVertex(cacheVertex);
+
+    console.log(cacheVertex.cacheIndex);
+    console.log("--+--");
     return cacheVertex.cacheIndex;
   }
 
@@ -407,6 +446,9 @@ function midPoint(idA, idB, cacheFaceIndex) {
     [idA, idB],
     cacheFaceIndex
   );
+
+  console.log(index);
+  console.log("-----");
 
   return index;
 }
@@ -534,7 +576,11 @@ function LODold(
   const meshDist = distance(cameraPos, [0, 0, 0]);
   // TODO: mby use this for not generating backside
 
-  faceCache
+  updateFrustum();
+  updateCullingVectors();
+  // console.log(findVisibleFaces(faceCache));
+  // faceCache
+  findVisibleFaces(faceCache)
     .filter(
       cacheFace =>
         cacheFace.isRendered ||
@@ -601,6 +647,7 @@ function findFirstFreeFaceIndex() {
 
 function removeCacheFace(cacheFace) {
   if (cacheFace.isRendered == false) {
+    console.log(cacheFace);
     throw new Error("MyError: face should be rendered before removing it");
   }
 
@@ -742,6 +789,12 @@ function reColorFace(cacheFace) {
       height = cacheVertex.originalNoise;
       // console.log("NOT Normalized: ", cacheFace.cacheVertices[i]);
     }
+
+    if (cacheFace.isRendered == false) {
+      console.log(cacheFace);
+      throw new Error("MyError: face should be rendered before recoloring it");
+    }
+
     face.vertexColors[i].setRGB(
       height * 0.8 + 0.1,
       height + 0.1,
@@ -752,9 +805,52 @@ function reColorFace(cacheFace) {
   }
 }
 
-function markFace(cacheFace) {
+function markFace(cacheFace, colorArray) {
   const face = geom.faces[cacheFace.geometryIndex];
   for (let i = 0; i < 3; i++) {
-    face.vertexColors[i].setRGB(0, 0, 1);
+    face.vertexColors[i].setRGB(...colorArray);
   }
+
+  geom.colorsNeedUpdate = true;
+}
+
+function updateFrustum() {
+  frustum.setFromMatrix(
+    new THREE.Matrix4().multiplyMatrices(
+      camera.projectionMatrix,
+      camera.matrixWorldInverse
+    )
+  );
+}
+
+function updateCullingVectors() {
+  geom.computeFaceNormals();
+  cameraVector = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+}
+
+function findVisibleFaces(faceArray) {
+  var visibleFaces = [];
+
+  faceArray
+    .filter(face => face.isRendered)
+    .forEach(face => {
+      let inFrustum = false;
+      face.cacheVertices.forEach(vertexId => {
+        let vertex = vertexCache[vertexId];
+        let pos = vertex.normalized ? vertex.normalizedPos : vertex.originalPos;
+        if (frustum.containsPoint(arrayToVec3(pos))) inFrustum = true;
+      });
+      // if (inFrustum) markFace(face);
+
+      let frontSide = false;
+      var normalVector = geom.faces[face.geometryIndex].normal.applyQuaternion(
+        icosphere.quaternion
+      );
+      if (normalVector.angleTo(cameraVector) > Math.PI / 2) frontSide = true;
+      // if (frontSide) markFace(face);
+
+      if (frontSide && inFrustum) visibleFaces.push(face);
+    });
+
+  return visibleFaces;
 }

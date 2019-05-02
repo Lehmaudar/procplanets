@@ -61,7 +61,7 @@
       let zoomSpeed;
       var clock = new THREE.Clock();
       var keyboard = new THREEx.KeyboardState();
-      var simplex = new SimplexNoise();
+      var simplex = new SimplexNoise(222);
 
       var trackballControls;
       var pointerLockControls;
@@ -73,6 +73,11 @@
       var target = new THREE.Vector3(3, -6, 6); // create on init
       var downTween, upTween;
 
+      var frustum = new THREE.Frustum();
+      var cameraVector = new THREE.Vector3();
+
+      var t1, t0;
+
       init();
       var variables = datGui();
       animate();
@@ -81,8 +86,8 @@
       function datGui() {
         var Variables = function() {
           // this.spinSpeed = 0.0;
-          this.tessConstant = 4;
-          this.tessGive = 1;
+          this.tessConstant = 1;
+          this.tessGive = 0.3;
           this.tessZoomIn = false;
           this.tessZoomOut = false;
           this.wireframe = false;
@@ -95,7 +100,7 @@
             icosphere.geometry.elementsNeedUpdate = true;
           };
           this.vertexColors = true;
-          this.useTreeStruc = true;
+          this.useTreeStruc = false;
           this.smootherControls = true;
         };
 
@@ -109,7 +114,7 @@
         folder2.open();
         // folder3.open();
         // folder1.add(variables, "spinSpeed", 0, 2);
-        folder2.add(variables, "tessConstant", 0.01, 25);
+        folder2.add(variables, "tessConstant", 0.01, 10);
         folder2.add(variables, "tessGive", 0, 10);
         folder2.add(variables, "tessZoomIn");
         folder2.add(variables, "tessZoomOut");
@@ -215,44 +220,23 @@
 
         document.body.onkeyup = e => {
           if (e.keyCode == 70) {
-            var frustum = new THREE.Frustum();
-            frustum.setFromMatrix(
-              new THREE.Matrix4().multiplyMatrices(
-                camera.projectionMatrix,
-                camera.matrixWorldInverse
-              )
-            );
-
-            geom.computeFaceNormals();
-            var cameraVector = new THREE.Vector3(0, 0, -1).applyQuaternion(
-              camera.quaternion
-            );
-
-            faceCache
-              .filter(face => face.isRendered)
-              .forEach(face => {
-                let inFrustum = false;
-                face.cacheVertices.forEach(vertexId => {
-                  let vertex = vertexCache[vertexId];
-                  let pos = vertex.normalized
-                    ? vertex.normalizedPos
-                    : vertex.originalPos;
-                  if (frustum.containsPoint(arrayToVec3(pos))) inFrustum = true;
-                });
-                // console.log(inFrustum);
-                // if (inFrustum) markFace(face);
-
-                let frontSide = false;
-                var normalVector = geom.faces[
-                  face.geometryIndex
-                ].normal.applyQuaternion(icosphere.quaternion);
-                if (normalVector.angleTo(cameraVector) > Math.PI / 2)
-                  frontSide = true;
-                if (frontSide) markFace(face);
-
-                geom.colorsNeedUpdate = true;
-              });
+            updateFrustum();
+            updateCullingVectors();
+            findVisibleFaces(faceCache).forEach(face => {
+              markFace(face, [0, 0, 1]);
+            });
+            // icosphere.geometry.elementsNeedUpdate = true;
+            geom.colorsNeedUpdate = true;
           }
+
+          if (e.keyCode == 83) {
+            subdivCacheFace(faceCache[1]);
+            geom.computeVertexNormals();
+            // addDetail();
+            icosphere.geometry.elementsNeedUpdate = true;
+          }
+
+          // subdivCacheFace(faceCache[1]);
 
           if (e.keyCode == 32) {
             if (onGround) {
@@ -275,7 +259,13 @@
               downTween = new TWEEN.Tween(camera.position)
                 .to(new THREE.Vector3().copy(pointer.position), 3000)
                 .easing(TWEEN.Easing.Quadratic.InOut)
-                .onComplete(() => {});
+                .onComplete(() => {
+                  t1 = performance.now();
+                  console.log(
+                    "Going on ground " + (t1 - t0) + " milliseconds."
+                  );
+                });
+              t0 = performance.now();
               downTween.start();
             }
           }
@@ -326,6 +316,7 @@
         // variable which is increase by Math.PI every seconds - usefull for animation
         var PIseconds = Date.now() * Math.PI;
 
+        // var t0 = performance.now();
         if (variables.useTreeStruc) {
           LOD(
             camera.position,
@@ -343,6 +334,8 @@
             variables.tessZoomOut
           );
         }
+        // var t1 = performance.now();
+        // console.log("Call to doSomething took " + (t1 - t0) + " milliseconds.");
 
         // actually render the scene
         renderer.render(scene, camera);
