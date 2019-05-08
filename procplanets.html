@@ -87,7 +87,7 @@
       function datGui() {
         var Variables = function() {
           // this.spinSpeed = 0.0;
-          this.tessConstant = 2;
+          this.tessConstant = 1;
           this.tessGive = 0.5;
           this.tessZoomIn = false;
           this.tessZoomOut = false;
@@ -243,24 +243,28 @@
             findVisibleFaces(faceCache).forEach(face => {
               markFace(face, [0, 0, 1]);
             });
-            // icosphere.geometry.elementsNeedUpdate = true;
             geom.colorsNeedUpdate = true;
           }
 
-          if (e.keyCode == 83) {
-            t0 = performance.now();
-            for (let i = 0; i < 500; i++) {
-              findVisibleFaces(faceCache);
-            }
-            t1 = performance.now();
-            console.log(
-              "FindVisibleFaces took " + (t1 - t0) + " milliseconds."
-            );
-
-            // upDateColors();
+          if (e.keyCode == 80) {
+            findNeighbours(faceCache[20]).forEach(face => {
+              subdivCacheFace(face);
+            });
+            geom.elementsNeedUpdate = true;
           }
 
-          // subdivCacheFace(faceCache[1]);
+          if (e.keyCode == 83) {
+            // t0 = performance.now();
+            // for (let i = 0; i < 500; i++) {
+            //   findVisibleFaces(faceCache);
+            // }
+            // t1 = performance.now();
+            // console.log(
+            //   "FindVisibleFaces took " + (t1 - t0) + " milliseconds."
+            // );
+
+            upDateColors();
+          }
 
           if (e.keyCode == 32) {
             if (onGround) {
