@@ -78,56 +78,72 @@
       var colorsNeedUpdate = false;
 
       var t1, t0;
+      var folder1, folder2, folder3;
+      // var colors = {};
+      // var colorsNew = {};
+      var colorNames = [];
 
-      init();
       var variables = datGui();
+      init();
       animate();
 
       // dat.gui ui
       function datGui() {
         var Variables = function() {
-          // this.spinSpeed = 0.0;
+          this.wireframe = false;
+          this.vertexColors = true;
+
           this.tessConstant = 1;
           this.tessGive = 0.5;
           this.tessZoomIn = false;
           this.tessZoomOut = false;
-          this.wireframe = false;
-          this.addDetail = function() {
+          this.addDetail = () => {
             t0 = performance.now();
             addDetail(faceCache);
             icosphere.geometry.elementsNeedUpdate = true;
             t1 = performance.now();
             console.log("AddDetail took " + (t1 - t0) + " milliseconds.");
           };
-          this.addDetailOptimized = function() {
+          this.addDetailOptimized = () => {
             t0 = performance.now();
             addDetail(findVisibleFaces(faceCache));
             icosphere.geometry.elementsNeedUpdate = true;
             t1 = performance.now();
             console.log("AddDetail took " + (t1 - t0) + " milliseconds.");
           };
-          this.removeDetail = function() {
+          this.removeDetail = () => {
             t0 = performance.now();
             removeDetail();
             icosphere.geometry.elementsNeedUpdate = true;
             t1 = performance.now();
             console.log("RemoveDetail took " + (t1 - t0) + " milliseconds.");
           };
-          this.vertexColors = true;
           this.useTreeStruc = false;
-          this.smootherControls = true;
+
+          // this.color1 = [0, 128, 255];
+          // this.color2 = [128, 0, 0];
+          // this.color3 = [0, 255, 0];
+          // this.color1L = 0;
+          // this.color2L = 0.1;
+          // this.color3L = 1;
+          this.addNewColor = function() {
+            addNewColor(
+              [122, 122, 122],
+              "asder" + colors.length,
+              Math.random()
+            );
+          };
         };
 
         variables = new Variables();
         gui = new dat.GUI();
 
-        var folder1 = gui.addFolder("Appearance");
-        var folder2 = gui.addFolder("Tesselation");
-        var folder3 = gui.addFolder("Controls");
-        // folder1.open();
+        folder1 = gui.addFolder("Appearance");
+        folder2 = gui.addFolder("Tesselation");
+        folder3 = gui.addFolder("Colors");
         folder2.open();
-        // folder3.open();
-        // folder1.add(variables, "spinSpeed", 0, 2);
+        folder3.open();
+
         folder2.add(variables, "tessConstant", 0.01, 10);
         folder2.add(variables, "tessGive", 0, 10);
         folder2.add(variables, "tessZoomIn");
@@ -138,29 +154,24 @@
         folder2.add(variables, "removeDetail");
         var wireframe = folder1.add(variables, "wireframe");
         var vertexColors = folder1.add(variables, "vertexColors");
-        wireframe.onChange(function(value) {
+        wireframe.onChange(value => {
           icosphere.material.wireframe = value;
         });
-        vertexColors.onChange(function(value) {
+        vertexColors.onChange(value => {
           value
             ? (icosphere.material.vertexColors = 1)
             : (icosphere.material.vertexColors = 0);
           icosphere.material.needsUpdate = true;
         });
-        var smootherControls = folder3.add(variables, "smootherControls");
-        // trackballControls.enabled = false;
-        smootherControls.onChange(function(value) {
-          value;
-          if (value) {
-            trackballControls.reset();
-            trackballControls.minDistance = 0;
-          } else {
-            trackballControls.zoomSpeed = 1.2;
-            trackballControls.rotateSpeed = 1.0;
-            trackballControls.minDistance = 1.0001;
-            trackballControls.reset();
-          }
-        });
+
+        // var color1 = folder3.addColor(variables, "color1");
+        // color1.onChange(function(value) {
+        //   upDateColors();
+        // });
+
+        // folder3.addColor(variables, "color2");
+        // folder3.addColor(variables, "color3");
+        folder3.add(variables, "addNewColor");
         return variables;
       }
 

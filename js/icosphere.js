@@ -2,33 +2,146 @@ var faceCache = [];
 var vertexCache = [];
 var geom;
 
+// const waterLevel = 0;
 const waterLevel = 0;
+const maxLevel = 1;
 
 function noise(position) {
   let value = 0;
-  let maxHeight = 0;
+  let noiseMaxHeight = 0;
 
   // value += simplex.noise3D(...changePos(position, 0.5)) * 0.1;
-  // value += simplex.noise3D(...changePos(position, 1)) * 0.1;
-  // value += simplex.noise3D(...changePos(position, 3)) * 0.05;
-  // value += simplex.noise3D(...changePos(position, 10)) * 0.01;
-
   const layers = [[0.5, 0.1], [1, 0.1], [3, 0.05], [10, 0.01]];
-
   layers.forEach(layer => {
     value += simplex.noise3D(...multiplyPos(position, layer[0])) * layer[1];
-    maxHeight += layer[1];
+    noiseMaxHeight += layer[1];
   });
-  value /= maxHeight;
-  if (value < waterLevel) value = waterLevel;
 
-  value += 0.1;
-  value /= 1.1;
-  return value;
+  value /= noiseMaxHeight;
+
+  if (value < waterLevel) {
+    value = waterLevel;
+  }
+
+  return value * maxLevel;
 }
 
 function multiplyPos(position, value) {
   return [position[0] * value, position[1] * value, position[2] * value];
+}
+
+function sortedDictKeysFromVariables() {
+  const asd = {};
+  colorNames.forEach(name => {
+    asd[variables[name + "Level"]] = name;
+  });
+
+  const asder = [];
+  for (var key in asd) {
+    console.log(key);
+    asder.push(key);
+  }
+
+  const sortedColors = [];
+  asder.sort().forEach(key => {
+    sortedColors.push(asd[key]);
+  });
+  return sortedColors;
+}
+
+function color(height) {
+  height = normalizeValue(height, waterLevel, maxLevel);
+
+  // const sortedColors = sortedDictKeysFromVariables(colors);
+  // console.log(sortedColors);
+
+  // const aC = variableToColorValue(variables.color1);
+  // const bC = variableToColorValue(variables.color2);
+  // const cC = variableToColorValue(variables.color3);
+  // const aL = variables.color1Level;
+  // const bL = variables.color2Level;
+  // const cL = variables.color3Level;
+
+  // console.log(aC, variableToColorValue(colors[colorLevels[0]]));
+  // console.log(bC, variableToColorValue(colors[colorLevels[1]]));
+  // console.log(cC, variableToColorValue(colors[colorLevels[2]]));
+  // console.log(aL, colorLevels[0]);
+  // console.log(bL, colorLevels[1]);
+  // console.log(cL, colorLevels[2]);
+  // console.log();
+
+  if (height < variables["color1" + "Level"]) {
+    return lerpRGB(
+      variableToColorValue([255, 255, 255]),
+      variableToColorValue(variables["color1"]),
+      normalizeValue(height, 0, variables["color1" + "Level"])
+    );
+  }
+  if (height < variables["color2" + "Level"]) {
+    return lerpRGB(
+      variableToColorValue(variables["color1"]),
+      variableToColorValue(variables["color2"]),
+      normalizeValue(
+        height,
+        variables["color1" + "Level"],
+        variables["color2" + "Level"]
+      )
+    );
+  }
+  if (height < variables["color3" + "Level"]) {
+    return lerpRGB(
+      variableToColorValue(variables["color2"]),
+      variableToColorValue(variables["color3"]),
+      normalizeValue(
+        height,
+        variables["color2" + "Level"],
+        variables["color3" + "Level"]
+      )
+    );
+  }
+
+  // if (height < bL) {
+  //   return lerpRGB(aC, bC, normalizeValue(height, aL, bL));
+  // } else {
+  //   return lerpRGB(bC, cC, normalizeValue(height, bL, cL));
+  // }
+
+  // return lerpRGB(a, b, height);
+  // return [height * 0.8 + 0.1, height + 0.1, height * 0.7 + 0.1];
+}
+
+function addNewColor(color, name, level) {
+  variables[name] = color;
+  folder3.addColor(variables, name).onChange(() => {
+    upDateColors();
+  });
+
+  variables[name + "Level"] = level;
+  folder3.add(variables, name + "Level", 0.0, 1.0).onChange(() => {
+    upDateColors();
+  });
+
+  colorNames.push(name);
+}
+
+function normalizeValue(value, bottom, top) {
+  return (value - bottom) / (top - bottom);
+}
+
+function variableToColorValue(variable) {
+  return [
+    normalizeValue(variable[0], 0, 255),
+    normalizeValue(variable[1], 0, 255),
+    normalizeValue(variable[2], 0, 255)
+  ];
+}
+
+function lerpRGB(a, b, t) {
+  return [
+    a[0] + (b[0] - a[0]) * t,
+    a[1] + (b[1] - a[1]) * t,
+    a[2] + (b[2] - a[2]) * t
+  ];
 }
 
 function icosphere() {
@@ -88,7 +201,6 @@ function icosphere() {
     geom.faces.push(face);
 
     const vertex = new THREE.Vector3(0, 0, 0);
-
     vertex.isFree = true;
     geom.vertices.push(vertex);
   }
@@ -109,11 +221,13 @@ function icosphere() {
   icosphere.name = "Icosphere";
   scene.add(icosphere);
 
-  subdivCacheFace(faceCache[0]);
-  undivCacheFace(faceCache[0]);
+  addDetail(faceCache);
+  addDetail(faceCache);
+  addDetail(faceCache);
 
-  geom.elementsNeedUpdate = true;
-  geom.colorsNeedUpdate = true;
+  addNewColor([59, 97, 188], "color1", 0.0);
+  addNewColor([149, 218, 23], "color2", 0.1);
+  addNewColor([193, 189, 134], "color3", 1.0);
 }
 
 function findNeighbours(cacheFace) {
@@ -143,6 +257,7 @@ function createVertex(
   vertex.x = position[0];
   vertex.y = position[1];
   vertex.z = position[2];
+  let water = false;
 
   let normalizedNoise = undefined;
   let originalNoise = undefined;
@@ -554,7 +669,6 @@ function LODold(
         faceCache[cacheFace.children[3]].isRendered &&
         faceEdgeLenght < tesselationConstant - tessGive
       ) {
-        console.log(0);
         undivCacheFace(cacheFace);
         geom.elementsNeedUpdate = true;
       }
@@ -620,6 +734,8 @@ function normalizeVertex(cacheVertex) {
     if (cacheVertex.normalizedPos == undefined) {
       vertex.normalize();
       cacheVertex.normalizedNoise = noise(vec3ToArray(vertex));
+      // console.log(cacheVertex.normalizedNoise);
+      cacheVertex.water;
       cacheVertex.normalizedPos = [
         vertex.x * (cacheVertex.normalizedNoise + 1),
         vertex.y * (cacheVertex.normalizedNoise + 1),
@@ -717,10 +833,6 @@ function simpleReColorFace(cacheFace) {
   }
 }
 
-function color(height) {
-  return [height * 0.8 + 0.1, height + 0.1, height * 0.7 + 0.1];
-}
-
 function markFace(cacheFace, colorArray) {
   const face = geom.faces[cacheFace.geometryIndex];
   for (let i = 0; i < 3; i++) {
@@ -745,6 +857,7 @@ function updateCullingVectors() {
 }
 
 function findVisibleFaces(faceArray) {
+  // TODO: ilmselt for-loop kiirem
   return faceArray
     .filter(face => face.isRendered)
     .filter(face => {
@@ -763,5 +876,16 @@ function findVisibleFaces(faceArray) {
         if (frustum.containsPoint(arrayToVec3(pos))) inFrustum = true;
       });
       return inFrustum;
+    })
+    .filter(face => {
+      if (
+        face.depth > 4 &&
+        vertexCache[face.cacheVertices[0]].normalizedNoise == waterLevel &&
+        vertexCache[face.cacheVertices[1]].normalizedNoise == waterLevel &&
+        vertexCache[face.cacheVertices[2]].normalizedNoise == waterLevel
+      ) {
+        return false;
+      }
+      return true;
     });
 }
