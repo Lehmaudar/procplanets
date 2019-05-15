@@ -2,28 +2,27 @@ var faceCache = [];
 var vertexCache = [];
 var geom;
 
-// const waterLevel = 0;
-const waterLevel = 0;
-const maxLevel = 1;
-
 function noise(position) {
   let value = 0;
   let noiseMaxHeight = 0;
 
+  const layers = [];
+  noiseNames.forEach(name => {
+    layers.push([variables[name + "Density"], variables[name + "Height"]]);
+  });
+
   // value += simplex.noise3D(...changePos(position, 0.5)) * 0.1;
-  const layers = [[0.5, 0.1], [1, 0.1], [3, 0.05], [10, 0.01]];
+  // const layers = [[0.5, 0.1], [1, 0.1], [3, 0.05], [10, 0.01]];
+
   layers.forEach(layer => {
     value += simplex.noise3D(...multiplyPos(position, layer[0])) * layer[1];
     noiseMaxHeight += layer[1];
   });
 
   value /= noiseMaxHeight;
+  if (value < variables.minLevel) value = variables.minLevel;
 
-  if (value < waterLevel) {
-    value = waterLevel;
-  }
-
-  return value * maxLevel;
+  return value * variables.maxLevel;
 }
 
 function multiplyPos(position, value) {
@@ -31,95 +30,81 @@ function multiplyPos(position, value) {
 }
 
 function sortedDictKeysFromVariables() {
-  const asd = {};
+  const colors = {};
   colorNames.forEach(name => {
-    asd[variables[name + "Level"]] = name;
+    colors[variables[name + "Level"]] = name;
   });
-
-  const asder = [];
-  for (var key in asd) {
-    console.log(key);
-    asder.push(key);
-  }
 
   const sortedColors = [];
-  asder.sort().forEach(key => {
-    sortedColors.push(asd[key]);
-  });
+  Object.keys(colors)
+    .sort()
+    .forEach(key => {
+      sortedColors.push(colors[key]);
+    });
   return sortedColors;
 }
 
 function color(height) {
-  height = normalizeValue(height, waterLevel, maxLevel);
+  height = normalizeValue(height, variables.minLevel, variables.maxLevel);
+  let sortedColors = sortedDictKeysFromVariables();
 
-  // const sortedColors = sortedDictKeysFromVariables(colors);
-  // console.log(sortedColors);
+  for (let i = 0; i < sortedColors.length; i++) {
+    if (height < variables[sortedColors[i] + "Level"]) {
+      if (i == 0) {
+        baseLevel = -1;
+        baseColor = [0, 0, 0];
+      } else {
+        baseLevel = variables[sortedColors[i - 1] + "Level"];
+        baseColor = variableToColorValue(variables[sortedColors[i - 1]]);
+      }
 
-  // const aC = variableToColorValue(variables.color1);
-  // const bC = variableToColorValue(variables.color2);
-  // const cC = variableToColorValue(variables.color3);
-  // const aL = variables.color1Level;
-  // const bL = variables.color2Level;
-  // const cL = variables.color3Level;
+      topLevel = variables[sortedColors[i] + "Level"];
+      topColor = variableToColorValue(variables[sortedColors[i]]);
 
-  // console.log(aC, variableToColorValue(colors[colorLevels[0]]));
-  // console.log(bC, variableToColorValue(colors[colorLevels[1]]));
-  // console.log(cC, variableToColorValue(colors[colorLevels[2]]));
-  // console.log(aL, colorLevels[0]);
-  // console.log(bL, colorLevels[1]);
-  // console.log(cL, colorLevels[2]);
-  // console.log();
-
-  if (height < variables["color1" + "Level"]) {
-    return lerpRGB(
-      variableToColorValue([255, 255, 255]),
-      variableToColorValue(variables["color1"]),
-      normalizeValue(height, 0, variables["color1" + "Level"])
-    );
-  }
-  if (height < variables["color2" + "Level"]) {
-    return lerpRGB(
-      variableToColorValue(variables["color1"]),
-      variableToColorValue(variables["color2"]),
-      normalizeValue(
-        height,
-        variables["color1" + "Level"],
-        variables["color2" + "Level"]
-      )
-    );
-  }
-  if (height < variables["color3" + "Level"]) {
-    return lerpRGB(
-      variableToColorValue(variables["color2"]),
-      variableToColorValue(variables["color3"]),
-      normalizeValue(
-        height,
-        variables["color2" + "Level"],
-        variables["color3" + "Level"]
-      )
-    );
+      return lerpRGB(
+        baseColor,
+        topColor,
+        normalizeValue(height, baseLevel, topLevel)
+      );
+    }
   }
 
-  // if (height < bL) {
-  //   return lerpRGB(aC, bC, normalizeValue(height, aL, bL));
-  // } else {
-  //   return lerpRGB(bC, cC, normalizeValue(height, bL, cL));
-  // }
-
-  // return lerpRGB(a, b, height);
-  // return [height * 0.8 + 0.1, height + 0.1, height * 0.7 + 0.1];
+  return lerpRGB(
+    variableToColorValue(variables[sortedColors[sortedColors.length - 1]]),
+    [1, 1, 1],
+    normalizeValue(
+      height,
+      variables[sortedColors[sortedColors.length - 1] + "Level"],
+      1
+    )
+  );
 }
 
-function addNewColor(color, name, level) {
+function addNewNoise(density, height) {
+  name = "noise" + noiseNames.length;
+  variables[name + "Density"] = density;
+  folder5.add(variables, name + "Density", 0.0, 10).step(0.01);
+
+  variables[name + "Height"] = height;
+  folder5.add(variables, name + "Height", 0.0, 1.0).step(0.01);
+
+  noiseNames.push(name);
+}
+
+function addNewColor(color, level) {
+  name = "color" + colorNames.length;
   variables[name] = color;
   folder3.addColor(variables, name).onChange(() => {
     upDateColors();
   });
 
   variables[name + "Level"] = level;
-  folder3.add(variables, name + "Level", 0.0, 1.0).onChange(() => {
-    upDateColors();
-  });
+  folder3
+    .add(variables, name + "Level", 0.0, 1.0)
+    .step(0.01)
+    .onChange(() => {
+      upDateColors();
+    });
 
   colorNames.push(name);
 }
@@ -144,8 +129,57 @@ function lerpRGB(a, b, t) {
   ];
 }
 
-function icosphere() {
+function initIcosphere() {
   geom = new THREE.Geometry();
+  for (let i = 0; i < 50000; i++) {
+    const face = new THREE.Face3(0, 0, 0);
+    face.isFree = true;
+    face.vertexColors[0] = new THREE.Color(0xff0000);
+    face.vertexColors[1] = new THREE.Color(0xaa3300);
+    face.vertexColors[2] = new THREE.Color(0xaa0033);
+    geom.faces.push(face);
+
+    const vertex = new THREE.Vector3(0, 0, 0);
+    vertex.isFree = true;
+    geom.vertices.push(vertex);
+  }
+
+  createIcosaherdron();
+
+  var mat = new THREE.MeshBasicMaterial({
+    vertexColors: THREE.VertexColors
+  });
+
+  var mesh = new THREE.Mesh(geom, mat);
+  mesh.name = "Icosphere";
+
+  addDetail(faceCache);
+  addDetail(faceCache);
+  addDetail(faceCache);
+  addDetail(faceCache);
+
+  return mesh;
+}
+
+function refreshIcosphere() {
+  faceCache = [];
+  vertexCache = [];
+  geom.faces.forEach(face => {
+    face.isFree = true;
+    face.a = 0;
+    face.b = 0;
+    face.c = 0;
+  });
+
+  createIcosaherdron();
+
+  addDetail(faceCache);
+  addDetail(faceCache);
+  addDetail(faceCache);
+  addDetail(faceCache);
+}
+
+function createIcosaherdron() {
   const t = 0.5 + Math.sqrt(5) / 2;
 
   const baseVertices = [
@@ -192,19 +226,6 @@ function icosphere() {
     [9, 8, 1]
   ];
 
-  for (let i = 0; i < 50000; i++) {
-    const face = new THREE.Face3(0, 0, 0);
-    face.isFree = true;
-    face.vertexColors[0] = new THREE.Color(0xff0000);
-    face.vertexColors[1] = new THREE.Color(0xaa3300);
-    face.vertexColors[2] = new THREE.Color(0xaa0033);
-    geom.faces.push(face);
-
-    const vertex = new THREE.Vector3(0, 0, 0);
-    vertex.isFree = true;
-    geom.vertices.push(vertex);
-  }
-
   baseVertices.forEach(vertex => {
     createVertex(vertex, true, [undefined, undefined], undefined);
   });
@@ -213,21 +234,7 @@ function icosphere() {
     createFace(face, undefined);
   });
 
-  var mat = new THREE.MeshBasicMaterial({
-    vertexColors: THREE.VertexColors
-  });
-
-  icosphere = new THREE.Mesh(geom, mat);
-  icosphere.name = "Icosphere";
-  scene.add(icosphere);
-
-  addDetail(faceCache);
-  addDetail(faceCache);
-  addDetail(faceCache);
-
-  addNewColor([59, 97, 188], "color1", 0.0);
-  addNewColor([149, 218, 23], "color2", 0.1);
-  addNewColor([193, 189, 134], "color3", 1.0);
+  geom.elementsNeedUpdate = true;
 }
 
 function findNeighbours(cacheFace) {
@@ -829,6 +836,8 @@ function simpleReColorFace(cacheFace) {
     const cacheVertex = vertexCache[cacheFace.cacheVertices[i]];
     if (cacheVertex.normalized) height = cacheVertex.normalizedNoise;
     else height = cacheVertex.originalNoise;
+    if (color(height) == undefined)
+      throw new Error("MyError: color came out undefined");
     face.vertexColors[i].setRGB(...color(height));
   }
 }
@@ -880,9 +889,11 @@ function findVisibleFaces(faceArray) {
     .filter(face => {
       if (
         face.depth > 4 &&
-        vertexCache[face.cacheVertices[0]].normalizedNoise == waterLevel &&
-        vertexCache[face.cacheVertices[1]].normalizedNoise == waterLevel &&
-        vertexCache[face.cacheVertices[2]].normalizedNoise == waterLevel
+        vertexCache[face.cacheVertices[0]].normalizedNoise ==
+          variables.minLevel &&
+        vertexCache[face.cacheVertices[1]].normalizedNoise ==
+          variables.minLevel &&
+        vertexCache[face.cacheVertices[2]].normalizedNoise == variables.minLevel
       ) {
         return false;
       }

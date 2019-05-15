@@ -9,13 +9,7 @@
       maximum-scale=1.0"
     />
 
-    <!-- External libraries from the web -->
-    <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/stats.js/r16/Stats.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r83/three.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.7.5/dat.gui.min.js"></script>
-    <script src="http://wzrd.in/standalone/uuid%2Fv1@latest"></script>
-    <script src="http://threejs.org/examples/js/controls/TrackballControls.js"></script> -->
-    <!-- External libraries from local machine -->
+    <!-- External libraries from local machine (add http://procplanets.tintdisain.ee before each source) -->
     <script type="text/javascript" src="js/external/simplex-noise.js"></script>
     <script type="text/javascript" src="js/external/three.r96.js"></script>
     <script type="text/javascript" src="js/external/stats.min.js"></script>
@@ -56,12 +50,12 @@
     <script type="text/javascript">
       var scene, renderer, composer, camera, icosphere;
       var stats, gui, cameraControls, keyboard;
-      // var variables = datGui();
+      var variables = datGui();
       var mouseSpeed = 0;
       let zoomSpeed;
       var clock = new THREE.Clock();
       var keyboard = new THREEx.KeyboardState();
-      var simplex = new SimplexNoise(222);
+      var simplex = new SimplexNoise(variables.seed);
 
       var trackballControls;
       var pointerLockControls;
@@ -69,7 +63,9 @@
       var mouse = new THREE.Vector2();
       var pointer;
       var onGround = false;
+
       var skyPos = new THREE.Vector3();
+      var skyRot = new THREE.Vector3();
       var target = new THREE.Vector3(3, -6, 6); // create on init
       var downTween, upTween;
 
@@ -79,11 +75,9 @@
 
       var t1, t0;
       var folder1, folder2, folder3;
-      // var colors = {};
-      // var colorsNew = {};
       var colorNames = [];
+      var noiseNames = [];
 
-      var variables = datGui();
       init();
       animate();
 
@@ -120,18 +114,18 @@
           };
           this.useTreeStruc = false;
 
-          // this.color1 = [0, 128, 255];
-          // this.color2 = [128, 0, 0];
-          // this.color3 = [0, 255, 0];
-          // this.color1L = 0;
-          // this.color2L = 0.1;
-          // this.color3L = 1;
           this.addNewColor = function() {
-            addNewColor(
-              [122, 122, 122],
-              "asder" + colors.length,
-              Math.random()
-            );
+            addNewColor([212, 10, 10], Math.random());
+          };
+
+          this.seed = 23;
+          this.addNewNoise = function() {
+            addNewNoise(Math.random(), 1);
+          };
+          this.maxLevel = 0.4;
+          this.minLevel = 0;
+          this.generate = () => {
+            refreshIcosphere();
           };
         };
 
@@ -141,37 +135,53 @@
         folder1 = gui.addFolder("Appearance");
         folder2 = gui.addFolder("Tesselation");
         folder3 = gui.addFolder("Colors");
-        folder2.open();
+        folder4 = gui.addFolder("Terrain");
+        folder5 = folder4.addFolder("Noise");
+        folder6 = folder4.addFolder("Height");
+        // folder2.open();
         folder3.open();
+        folder4.open();
+        folder5.open();
+        folder6.open();
 
         folder2.add(variables, "tessConstant", 0.01, 10);
         folder2.add(variables, "tessGive", 0, 10);
         folder2.add(variables, "tessZoomIn");
-        folder2.add(variables, "tessZoomOut");
-        folder2.add(variables, "useTreeStruc");
+        // folder2.add(variables, "tessZoomOut");
+        // folder2.add(variables, "useTreeStruc");
         folder2.add(variables, "addDetail");
         folder2.add(variables, "addDetailOptimized");
         folder2.add(variables, "removeDetail");
-        var wireframe = folder1.add(variables, "wireframe");
-        var vertexColors = folder1.add(variables, "vertexColors");
-        wireframe.onChange(value => {
+        folder1.add(variables, "wireframe").onChange(value => {
           icosphere.material.wireframe = value;
         });
-        vertexColors.onChange(value => {
+        folder1.add(variables, "vertexColors").onChange(value => {
           value
             ? (icosphere.material.vertexColors = 1)
             : (icosphere.material.vertexColors = 0);
           icosphere.material.needsUpdate = true;
         });
 
-        // var color1 = folder3.addColor(variables, "color1");
-        // color1.onChange(function(value) {
-        //   upDateColors();
-        // });
-
-        // folder3.addColor(variables, "color2");
-        // folder3.addColor(variables, "color3");
         folder3.add(variables, "addNewColor");
+
+        folder5.add(variables, "addNewNoise");
+        folder6
+          .add(variables, "maxLevel", 0, 1)
+          .step(0.01)
+          .onChange(value => {
+            if (value < Math.abs(variables.minLevel))
+              variables.minLevel = -variables.maxLevel;
+          });
+        folder6
+          .add(variables, "minLevel", -1, 0)
+          .step(0.01)
+          .onChange(value => {
+            if (Math.abs(value) > variables.maxLevel)
+              variables.minLevel = -variables.maxLevel;
+          })
+          .listen();
+        folder4.add(variables, "generate");
+
         return variables;
       }
 
@@ -219,8 +229,16 @@
         // trackballControls.minDistance = 1.00001;
         trackballControls.maxDistance = 40;
 
+        // Dat.GUI
+        addNewColor([59, 97, 188], 0.0);
+        addNewColor([210, 203, 94], 0.1);
+        addNewColor([71, 155, 53], 0.3);
+        addNewNoise(0.6, 1);
+        addNewNoise(1.3, 0.9);
+        addNewNoise(6, 0.2);
+
         // Objects
-        icosphere();
+        icosphere = initIcosphere();
         group = new THREE.Object3D();
         group.add(icosphere);
         scene.add(group);
@@ -264,18 +282,7 @@
             geom.elementsNeedUpdate = true;
           }
 
-          if (e.keyCode == 83) {
-            // t0 = performance.now();
-            // for (let i = 0; i < 500; i++) {
-            //   findVisibleFaces(faceCache);
-            // }
-            // t1 = performance.now();
-            // console.log(
-            //   "FindVisibleFaces took " + (t1 - t0) + " milliseconds."
-            // );
-
-            upDateColors();
-          }
+          if (e.keyCode == 83) upDateColors();
 
           if (e.keyCode == 32) {
             if (onGround) {
@@ -307,7 +314,7 @@
                 .onComplete(() => {
                   t1 = performance.now();
                   console.log(
-                    "Going on ground " + (t1 - t0) + " milliseconds."
+                    "Going on ground took " + (t1 - t0) + " milliseconds."
                   );
                 });
               t0 = performance.now();
@@ -338,11 +345,6 @@
           pointer.position.set(0, 0, 0);
         } else {
           for (var i = 0; i < intersects.length; i++) {
-            // const index = intersects[i].faceIndex;
-            // const cacheFace = faceCache.filter(
-            //   face => face.geometryIndex == index
-            // )[0];
-            // pointer.position.set(...multiplyPos(cacheFace.middlePos, 1.05));
             const point = intersects[i].point;
             pointer.position.set(...multiplyPos(vec3ToArray(point), 1.05));
           }
