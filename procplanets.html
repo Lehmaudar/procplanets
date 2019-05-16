@@ -23,6 +23,10 @@
       type="text/javascript"
       src="js/external/PointerLockControls.js"
     ></script>
+    <script
+      type="text/javascript"
+      src="js/external/FirstPersonControls.js"
+    ></script>
 
     <script
       type="text/javascript"
@@ -32,6 +36,7 @@
 
     <!-- Project js files -->
     <script type="text/javascript" src="js/icosphere.js"></script>
+    <script type="text/javascript" src="js/controls.js"></script>
 
     <style>
       body {
@@ -52,20 +57,19 @@
       var stats, gui, cameraControls, keyboard;
       var variables = datGui();
       var mouseSpeed = 0;
-      let zoomSpeed;
+      var zoomSpeed;
       var clock = new THREE.Clock();
       var keyboard = new THREEx.KeyboardState();
       var simplex = new SimplexNoise(variables.seed);
 
-      var trackballControls;
-      var pointerLockControls;
+      var trackballControls, pointerLockControls, pointer;
       var raycaster = new THREE.Raycaster();
       var mouse = new THREE.Vector2();
-      var pointer;
       var onGround = false;
 
       var skyPos = new THREE.Vector3();
       var skyRot = new THREE.Vector3();
+      var testVec = new THREE.Vector3(0, 0, 0);
       var target = new THREE.Vector3(3, -6, 6); // create on init
       var downTween, upTween;
 
@@ -77,6 +81,8 @@
       var folder1, folder2, folder3;
       var colorNames = [];
       var noiseNames = [];
+
+      var conPointer, camPointerPitchHelper, camPointerPitchHelper, conOrbit;
 
       init();
       animate();
@@ -212,26 +218,19 @@
         scene = new THREE.Scene();
 
         // put a camera in the scene
-        camera = new THREE.PerspectiveCamera(
+        orgCamera = new THREE.PerspectiveCamera(
           15,
           window.innerWidth / window.innerHeight,
           0.001,
           10000
         );
-        camera.position.set(0, 0, 15);
-        scene.add(camera);
-
-        // create a camera contol
-        trackballControls = new THREE.TrackballControls(
-          camera,
-          renderer.domElement
-        );
-        // trackballControls.minDistance = 1.00001;
-        trackballControls.maxDistance = 40;
+        orgCamera.position.set(0, 0, 15);
+        scene.add(orgCamera);
+        camera = orgCamera;
 
         // Dat.GUI
         addNewColor([59, 97, 188], 0.0);
-        addNewColor([210, 203, 94], 0.1);
+        addNewColor([210, 203, 94], 0.01);
         addNewColor([71, 155, 53], 0.3);
         addNewNoise(0.6, 1);
         addNewNoise(1.3, 0.9);
@@ -242,6 +241,8 @@
         group = new THREE.Object3D();
         group.add(icosphere);
         scene.add(group);
+        var axes = new THREE.AxisHelper(2);
+        scene.add(axes);
 
         // Raycaster
         raycaster = new THREE.Raycaster();
@@ -257,76 +258,11 @@
             color: 0x0000ff
           })
         );
+        pointer.add(new THREE.AxesHelper(0.1));
         scene.add(pointer);
         scene.add(mover);
 
-        var downTween = new TWEEN.Tween(camera.position)
-          .to(new THREE.Vector3().copy(pointer.position), 3000)
-          .easing(TWEEN.Easing.Quadratic.InOut)
-          .onComplete(() => {});
-
-        document.body.onkeyup = e => {
-          if (e.keyCode == 70) {
-            updateFrustum();
-            updateCullingVectors();
-            findVisibleFaces(faceCache).forEach(face => {
-              markFace(face, [0, 0, 1]);
-            });
-            geom.colorsNeedUpdate = true;
-          }
-
-          if (e.keyCode == 80) {
-            findNeighbours(faceCache[20]).forEach(face => {
-              subdivCacheFace(face);
-            });
-            geom.elementsNeedUpdate = true;
-          }
-
-          if (e.keyCode == 83) upDateColors();
-
-          if (e.keyCode == 32) {
-            if (onGround) {
-              onGround = false;
-              pointer.material.color.setRGB(0.9, 0.9, 0.9);
-              if (downTween != undefined) downTween.stop();
-              upTween = new TWEEN.Tween(camera.position)
-                .to(new THREE.Vector3().copy(skyPos), 3000)
-                .easing(TWEEN.Easing.Quadratic.InOut)
-                .onComplete(() => {
-                  trackballControls.enabled = true;
-                });
-              upTween.start();
-            } else if (
-              pointer.position.x != 0 &&
-              pointer.position.y != 0 &&
-              pointer.position.x != 0
-            ) {
-              onGround = true;
-              if (upTween == undefined || !upTween._isPlaying) {
-                skyPos.copy(camera.position);
-              }
-              if (upTween != undefined) upTween.stop();
-              trackballControls.enabled = false;
-              pointer.material.color.setRGB(0.7, 0.9, 0.7);
-              downTween = new TWEEN.Tween(camera.position)
-                .to(new THREE.Vector3().copy(pointer.position), 3000)
-                .easing(TWEEN.Easing.Quadratic.InOut)
-                .onComplete(() => {
-                  t1 = performance.now();
-                  console.log(
-                    "Going on ground took " + (t1 - t0) + " milliseconds."
-                  );
-                });
-              t0 = performance.now();
-              downTween.start();
-            }
-          }
-        };
-      }
-
-      function onMouseMove(event) {
-        mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-        mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+        initControls();
       }
 
       // animation loop
@@ -335,8 +271,9 @@
         delta = clock.getDelta();
 
         // update camera controls
-        if (trackballControls.enabled) {
-          smootherControls(delta);
+        if (conOrbit != undefined && conOrbit.enabled) {
+          // smootherControls(delta);
+          conOrbit.update();
         }
 
         raycaster.setFromCamera(mouse, camera);
@@ -385,51 +322,6 @@
         if (colorsNeedUpdate) upDateColors();
 
         renderer.render(scene, camera);
-      }
-
-      function smootherControls() {
-        const oldCameraPos = vec3ToArray(camera.position);
-        const oldCameraRot = vec3ToArray(camera.rotation);
-        const oldCameraDist = distance(oldCameraPos, [0, 0, 0]);
-
-        const oldTargetPos = vec3ToArray(trackballControls.target);
-        const oldTargetDist = distance(oldTargetPos, [0, 0, 0]);
-
-        // dist, startvalue, startvalue + endvalue, endDist
-        ease = easeFunc(oldCameraDist - 1, 0, 1, 40);
-
-        trackballControls.zoomSpeed = ease;
-        trackballControls.rotateSpeed = ease * 2;
-        trackballControls.panSpeed = ease / 5;
-
-        trackballControls.update();
-
-        const newCameraDist = distance(vec3ToArray(camera.position), [0, 0, 0]);
-        if (newCameraDist < 1.00002) {
-          camera.position.set(...oldCameraPos);
-          camera.rotation.set(...oldCameraRot);
-        }
-
-        const newTargetDist = distance(vec3ToArray(trackballControls.target), [
-          0,
-          0,
-          0
-        ]);
-        if (newTargetDist > 1.00002) {
-          trackballControls.target.normalize();
-        }
-      }
-
-      function easeFunc(t, b, c, d) {
-        var ts = (t /= d) * t;
-        var tc = ts * t;
-        return b + c * (-1 * ts * ts + 4 * tc + -6 * ts + 4 * t);
-      }
-
-      function onWindowResize() {
-        camera.aspect = window.innerWidth / window.innerHeight;
-        camera.updateProjectionMatrix();
-        renderer.setSize(window.innerWidth, window.innerHeight);
       }
     </script>
   </body>

@@ -20,9 +20,11 @@ function noise(position) {
   });
 
   value /= noiseMaxHeight;
+  value *= variables.maxLevel;
   if (value < variables.minLevel) value = variables.minLevel;
 
-  return value * variables.maxLevel;
+  // return value * variables.maxLevel;
+  return value;
 }
 
 function multiplyPos(position, value) {
