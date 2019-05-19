@@ -240,14 +240,18 @@ function createIcosaherdron() {
 }
 
 function findNeighbours(cacheFace) {
+  // return [];
+
   const parent = faceCache[cacheFace.parent];
   if (parent == undefined) return [];
   return faceCache.filter(face => {
-    if (!face.isRendered) return false;
+    if (!face.isRendered || face.depth > cacheFace.depth) return false;
     found = false;
     for (let i = 0; i < 3; i++) {
       if (face.cacheVertices.includes(parent.cacheVertices[i])) {
-        if (found) return found;
+        if (found) {
+          return found;
+        }
         found = true;
       }
     }

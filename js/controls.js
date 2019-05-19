@@ -18,22 +18,11 @@ function initControls() {
       // });
       // geom.elementsNeedUpdate = true;
 
-      //   if (conOrbit.enabled) {
-      //     setPointerControls();
-      //   } else {
-      //     setOrbitControls();
-      //   }
-
-      //   camPointerYawHelper.rotation.x += 0.1;
-      //   camPointer.rotation.x += 0.1;
-
-      console.log(camera.rotation);
-      console.log(camOrbit.rotation);
-      console.log(camPointer.rotation);
-      console.log(camPointerYawHelper.rotation);
-      //   console.log(camPointerYawHelper.children[0].rotation);
-      console.log(camPointerYawHelper.up);
-      console.log("");
+      if (conOrbit.enabled) {
+        setPointerControls();
+      } else {
+        setOrbitControls();
+      }
     }
 
     // camera travel
@@ -53,6 +42,9 @@ function initControls() {
   setupControls();
   setOrbitControls();
   // setPointerControls();
+
+  //   console.log(createjs.RotationPlugin);
+  //   createjs.RotationPlugin.install();
 }
 
 function toSky() {
@@ -62,6 +54,8 @@ function toSky() {
 
   setOrbitControls();
   conOrbit.enabled = false;
+
+  targetQuarternion = new THREE.Quaternion().setFromEuler(skyRot);
 
   const tweens = {
     fov: camera.fov,
@@ -90,6 +84,8 @@ function toSky() {
     .onUpdate(() => {
       camera.position.set(tweens.x, tweens.y, tweens.z);
       camera.rotation.set(tweens.xR, tweens.yR, tweens.zR);
+      // camera.quaternion.slerp(targetQuarternion, tweens.t);
+
       camOrbit.fov = tweens.fov;
       camPointer.fov = tweens.fov;
       camera.updateProjectionMatrix();
@@ -116,11 +112,22 @@ function toGround() {
   conOrbit.enabled = false;
   pointer.material.color.setRGB(0.7, 0.9, 0.7);
 
+  targetQuarternion = new THREE.Quaternion().copy(pointer.quaternion);
+  targetMesh = new THREE.Mesh().copy(pointer);
+  // camera.lookAt(targetMesh.position);
+  console.log(targetMesh.position);
+  console.log(multiplyPos(vec3ToArray(targetMesh.position), 2));
+  // camera.lookAt(...multiplyPos(vec3ToArray(targetMesh.position), 2));
+
   const tweens = {
     fov: camera.fov,
     x: camera.position.x,
     y: camera.position.y,
-    z: camera.position.z
+    z: camera.position.z,
+    xR: camera.rotation.x,
+    yR: camera.rotation.y,
+    zR: camera.rotation.z,
+    t: 0
   };
   downTween = new TWEEN.Tween(tweens)
     .to(
@@ -128,14 +135,25 @@ function toGround() {
         fov: 60,
         x: pointer.position.x,
         y: pointer.position.y,
-        z: pointer.position.z
+        z: pointer.position.z,
+        xR: pointer.rotation.x,
+        yR: pointer.rotation.y,
+        zR: pointer.rotation.z,
+        t: 1
       },
       1000
     )
     .easing(TWEEN.Easing.Quadratic.InOut)
     .onUpdate(() => {
       camera.position.set(tweens.x, tweens.y, tweens.z);
-      camera.fov = tweens.fov;
+      camera.rotation.set(tweens.xR, tweens.yR, tweens.zR);
+      // camera.up.set(...multiplyPos(vec3ToArray(targetMesh.position), 2));
+      // camera.lookAt(...multiplyPos(vec3ToArray(targetMesh.position), 1.001));
+
+      // camera.quaternion.slerp(targetQuarternion, tweens.t);
+
+      camOrbit.fov = tweens.fov;
+      camPointer.fov = tweens.fov;
       camera.updateProjectionMatrix();
     })
     .onComplete(() => {
@@ -150,20 +168,6 @@ function toGround() {
 }
 
 function setupControls() {
-  camPointer = new THREE.PerspectiveCamera(
-    60,
-    window.innerWidth / window.innerHeight,
-    0.001,
-    100
-  );
-  camPointer.position.set(0, 0, 0);
-  scene.add(camPointer);
-  conPointer = new THREE.PointerLockControls(camPointer);
-  conPointer.speedFactor = 0.1;
-  camPointerYawHelper = conPointer.getObject();
-  camPointerPitchHelper = camPointerYawHelper.children[0];
-  //   scene.add(camPointerYawHelper);
-
   camOrbit = new THREE.PerspectiveCamera(
     15,
     window.innerWidth / window.innerHeight,
@@ -175,12 +179,18 @@ function setupControls() {
   conOrbit.maxDistance = 40;
   conOrbit.enabled = false;
   scene.add(camOrbit);
+
+  conPointer = new THREE.PointerLockControls(camOrbit);
+  conPointer.speedFactor = 0.1;
+  camPointer = conPointer.getObject();
 }
 
 function setPointerControls() {
-  camPointerYawHelper.position.copy(camera.position);
-  camPointerYawHelper.rotation.copy(camera.rotation);
-  //   camPointerPitchHelper.rotation.copy(camera.rotation);
+  // camPointer.copy(camera);
+  camPointer.position.copy(camera.position);
+  camPointer.rotation.copy(camera.rotation);
+  // camPointer.up.copy(camera.up);
+  // camPointer.lookAt(0, 0, 0);
 
   conOrbit.enabled = false;
   pointer.visible = false;
@@ -189,13 +199,8 @@ function setPointerControls() {
 }
 
 function setOrbitControls() {
-  // camPointerYawHelper.rotation.set(camPointerPitchHelper.x, camPointerYawHelper.y, 0s)
-  // camOrbit.position.copy(camera.position);
-
-  //   camOrbit.rotation.set(camPointerPitchHelper.x, camPointerYawHelper.y);
-  camOrbit.lookAt(conPointer.getDirection());
-  //   console.log(conPointer);
-  //   camOrbit.rotation.copy(conPointer.getDirection());
+  camOrbit.position.copy(camera.position);
+  camOrbit.rotation.copy(camera.rotation);
 
   conPointer.unlock();
   conOrbit.enabled = true;
@@ -204,7 +209,43 @@ function setOrbitControls() {
   controls = conOrbit;
 }
 
+var asd = 0;
+
 function smootherControls() {
+  // pointer.lookAt(0, 0, 0);
+  pointer.lookAt(...multiplyPos(vec3ToArray(pointer.position), 2));
+
+  //   console.log(pointer.matrix.elements);
+  //   pointer.rotation.x += 0.1;
+  // pointer.matrix.elements[2] = pointer.position.x;
+  // pointer.matrix.elements[6] = pointer.position.y;
+  // pointer.matrix.elements[10] = pointer.position.z;
+  // asd += 0.1;
+  // //   pointer.matrix.elements[10] = asd;
+  // //   pointer.matrixAutoUpdate = false;
+  // //   pointer.matrixWorldNeedsUpdate = true;
+  // //   pointer.updateMatrixWorld();
+  // //   pointer.updateMatrix();
+  // //   pointer.setRotationFromMatrix(pointer.matrix);
+  // //   pointer.matrix.decompose(pointer.position, pointer.quaternion, pointer.scale);
+
+  // xAxis = new THREE.Vector3();
+  // yAxis = new THREE.Vector3();
+  // zAxis = new THREE.Vector3();
+
+  // pointer.matrix.extractBasis(xAxis, yAxis, zAxis);
+  //   console.log("");
+  //   console.log(zAxis);
+  //   console.log(
+  //     pointer.matrix.elements[2],
+  //     pointer.matrix.elements[6],
+  //     pointer.matrix.elements[10]
+  //   );
+
+  //   var vector = new THREE.Vector3(0, 0, 1);
+  //   vector.applyQuaternion(new THREE.Quaternion().setFromEuler(pointer.rotation));
+  //   pointer.rotation.setFromVector3(vector);
+
   const oldCameraPos = vec3ToArray(camera.position);
   const oldCameraRot = vec3ToArray(camera.rotation);
   const oldCameraDist = distance(oldCameraPos, [0, 0, 0]);

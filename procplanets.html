@@ -14,7 +14,6 @@
     <script type="text/javascript" src="js/external/three.r96.js"></script>
     <script type="text/javascript" src="js/external/stats.min.js"></script>
     <script type="text/javascript" src="js/external/dat.gui.min.js"></script>
-    <script type="text/javascript" src="js/external/uuid_v1@latest.js"></script>
     <script
       type="text/javascript"
       src="js/external/TrackballControls.js"
@@ -23,11 +22,6 @@
       type="text/javascript"
       src="js/external/PointerLockControls.js"
     ></script>
-    <script
-      type="text/javascript"
-      src="js/external/FirstPersonControls.js"
-    ></script>
-
     <script
       type="text/javascript"
       src="js/external/THREEx.KeyboardState.js"
@@ -68,7 +62,7 @@
       var onGround = false;
 
       var skyPos = new THREE.Vector3();
-      var skyRot = new THREE.Vector3();
+      var skyRot = new THREE.Euler();
       var testVec = new THREE.Vector3(0, 0, 0);
       var target = new THREE.Vector3(3, -6, 6); // create on init
       var downTween, upTween;
@@ -82,7 +76,9 @@
       var colorNames = [];
       var noiseNames = [];
 
-      var conPointer, camPointerPitchHelper, camPointerPitchHelper, conOrbit;
+      var conPointer, camPointerHelper, conOrbit;
+
+      // createjs.RotationPlugin.install();
 
       init();
       animate();
@@ -93,8 +89,8 @@
           this.wireframe = false;
           this.vertexColors = true;
 
-          this.tessConstant = 1;
-          this.tessGive = 0.5;
+          this.tessConstant = 12;
+          this.tessGive = 0;
           this.tessZoomIn = false;
           this.tessZoomOut = false;
           this.addDetail = () => {
@@ -150,8 +146,8 @@
         folder5.open();
         folder6.open();
 
-        folder2.add(variables, "tessConstant", 0.01, 10);
-        folder2.add(variables, "tessGive", 0, 10);
+        folder2.add(variables, "tessConstant", 0.01, 20);
+        // folder2.add(variables, "tessGive", 0, 10);
         folder2.add(variables, "tessZoomIn");
         // folder2.add(variables, "tessZoomOut");
         // folder2.add(variables, "useTreeStruc");
@@ -172,7 +168,7 @@
 
         folder5.add(variables, "addNewNoise");
         folder6
-          .add(variables, "maxLevel", 0, 1)
+          .add(variables, "maxLevel", 0.01, 1)
           .step(0.01)
           .onChange(value => {
             if (value < Math.abs(variables.minLevel))
@@ -241,8 +237,8 @@
         group = new THREE.Object3D();
         group.add(icosphere);
         scene.add(group);
-        var axes = new THREE.AxisHelper(2);
-        scene.add(axes);
+        var axes = new THREE.AxesHelper(2);
+        icosphere.add(axes);
 
         // Raycaster
         raycaster = new THREE.Raycaster();
@@ -272,8 +268,8 @@
 
         // update camera controls
         if (conOrbit != undefined && conOrbit.enabled) {
-          // smootherControls(delta);
-          conOrbit.update();
+          smootherControls(delta);
+          // conOrbit.update();
         }
 
         raycaster.setFromCamera(mouse, camera);
@@ -283,7 +279,7 @@
         } else {
           for (var i = 0; i < intersects.length; i++) {
             const point = intersects[i].point;
-            pointer.position.set(...multiplyPos(vec3ToArray(point), 1.05));
+            pointer.position.set(...multiplyPos(vec3ToArray(point), 1.005));
           }
         }
 
