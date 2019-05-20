@@ -1,6 +1,6 @@
 function initControls() {
   document.body.onkeyup = e => {
-    // culling
+    // culling - f
     if (e.keyCode == 70) {
       updateFrustum();
       updateCullingVectors();
@@ -9,15 +9,16 @@ function initControls() {
       });
       geom.colorsNeedUpdate = true;
     }
+
+    // update colors - s
     if (e.keyCode == 83) upDateColors();
 
-    // testing
-    if (e.keyCode == 80) {
-      // findNeighbours(faceCache[20]).forEach(face => {
-      //   subdivCacheFace(face);
-      // });
-      // geom.elementsNeedUpdate = true;
+    // testing - i
+    if (e.keyCode == 73) {
+    }
 
+    // testing - p
+    if (e.keyCode == 80) {
       if (conOrbit.enabled) {
         setPointerControls();
       } else {
@@ -25,7 +26,7 @@ function initControls() {
       }
     }
 
-    // camera travel
+    // camera travel - space
     if (e.keyCode == 32) {
       if (onGround) {
         toSky();
@@ -42,9 +43,6 @@ function initControls() {
   setupControls();
   setOrbitControls();
   // setPointerControls();
-
-  //   console.log(createjs.RotationPlugin);
-  //   createjs.RotationPlugin.install();
 }
 
 function toSky() {
@@ -86,22 +84,19 @@ function toSky() {
       camera.rotation.set(tweens.xR, tweens.yR, tweens.zR);
       // camera.quaternion.slerp(targetQuarternion, tweens.t);
 
-      camOrbit.fov = tweens.fov;
-      camPointer.fov = tweens.fov;
+      camera.fov = tweens.fov;
       camera.updateProjectionMatrix();
     })
     .onComplete(() => {
       conOrbit.enabled = true;
+      // pointer.visible = true;
+      // console.log(camera.rotation);
     });
   upTween.start();
-
-  // upTweenRot = new TWEEN.Tween(camOrbit.up)
-  //   .to(new THREE.Vector3().copy(skyRot), 3000)
-  //   .easing(TWEEN.Easing.Quadratic.InOut);
-  // upTweenRot.start();
 }
 
 function toGround() {
+  // pointer.visible = false;
   onGround = true;
   if (upTween == undefined || !upTween._isPlaying) {
     skyPos.copy(camera.position);
@@ -110,13 +105,13 @@ function toGround() {
 
   if (upTween != undefined) upTween.stop();
   conOrbit.enabled = false;
-  pointer.material.color.setRGB(0.7, 0.9, 0.7);
+  // pointer.material.color.setRGB(0.7, 0.9, 0.7);
 
   targetQuarternion = new THREE.Quaternion().copy(pointer.quaternion);
   targetMesh = new THREE.Mesh().copy(pointer);
   // camera.lookAt(targetMesh.position);
-  console.log(targetMesh.position);
-  console.log(multiplyPos(vec3ToArray(targetMesh.position), 2));
+  // console.log(targetMesh.position);
+  // console.log(multiplyPos(vec3ToArray(targetMesh.position), 2));
   // camera.lookAt(...multiplyPos(vec3ToArray(targetMesh.position), 2));
 
   const tweens = {
@@ -141,71 +136,45 @@ function toGround() {
         zR: pointer.rotation.z,
         t: 1
       },
-      1000
+      3000
     )
     .easing(TWEEN.Easing.Quadratic.InOut)
     .onUpdate(() => {
       camera.position.set(tweens.x, tweens.y, tweens.z);
-      camera.rotation.set(tweens.xR, tweens.yR, tweens.zR);
+      // camera.rotation.set(tweens.xR, tweens.yR, tweens.zR);
       // camera.up.set(...multiplyPos(vec3ToArray(targetMesh.position), 2));
       // camera.lookAt(...multiplyPos(vec3ToArray(targetMesh.position), 1.001));
-
       // camera.quaternion.slerp(targetQuarternion, tweens.t);
 
-      camOrbit.fov = tweens.fov;
-      camPointer.fov = tweens.fov;
+      camera.fov = tweens.fov;
       camera.updateProjectionMatrix();
     })
     .onComplete(() => {
       setPointerControls();
     });
   downTween.start();
-
-  // downTweenRot = new TWEEN.Tween(camOrbit.up)
-  //   .to(new THREE.Vector3().copy(pointer.position), 3000)
-  //   .easing(TWEEN.Easing.Quadratic.InOut);
-  // downTweenRot.start();
 }
 
 function setupControls() {
-  camOrbit = new THREE.PerspectiveCamera(
-    15,
-    window.innerWidth / window.innerHeight,
-    0.001,
-    100
-  );
-  camOrbit.position.set(0, 0, 5);
-  conOrbit = new THREE.TrackballControls(camOrbit, renderer.domElement);
+  conPointer = new THREE.PointerLockControls(orgCamera);
+  conPointer.speedFactor = 0.1;
+  camera = conPointer.getObject();
+
+  conOrbit = new THREE.TrackballControls(camera, renderer.domElement);
   conOrbit.maxDistance = 40;
   conOrbit.enabled = false;
-  scene.add(camOrbit);
-
-  conPointer = new THREE.PointerLockControls(camOrbit);
-  conPointer.speedFactor = 0.1;
-  camPointer = conPointer.getObject();
 }
 
 function setPointerControls() {
-  // camPointer.copy(camera);
-  camPointer.position.copy(camera.position);
-  camPointer.rotation.copy(camera.rotation);
-  // camPointer.up.copy(camera.up);
-  // camPointer.lookAt(0, 0, 0);
-
   conOrbit.enabled = false;
-  pointer.visible = false;
-  camera = camPointer;
+  // pointer.visible = false;
   conPointer.lock();
 }
 
 function setOrbitControls() {
-  camOrbit.position.copy(camera.position);
-  camOrbit.rotation.copy(camera.rotation);
-
   conPointer.unlock();
   conOrbit.enabled = true;
-  pointer.visible = true;
-  camera = camOrbit;
+  // pointer.visible = true;
   controls = conOrbit;
 }
 
@@ -213,38 +182,7 @@ var asd = 0;
 
 function smootherControls() {
   // pointer.lookAt(0, 0, 0);
-  pointer.lookAt(...multiplyPos(vec3ToArray(pointer.position), 2));
-
-  //   console.log(pointer.matrix.elements);
-  //   pointer.rotation.x += 0.1;
-  // pointer.matrix.elements[2] = pointer.position.x;
-  // pointer.matrix.elements[6] = pointer.position.y;
-  // pointer.matrix.elements[10] = pointer.position.z;
-  // asd += 0.1;
-  // //   pointer.matrix.elements[10] = asd;
-  // //   pointer.matrixAutoUpdate = false;
-  // //   pointer.matrixWorldNeedsUpdate = true;
-  // //   pointer.updateMatrixWorld();
-  // //   pointer.updateMatrix();
-  // //   pointer.setRotationFromMatrix(pointer.matrix);
-  // //   pointer.matrix.decompose(pointer.position, pointer.quaternion, pointer.scale);
-
-  // xAxis = new THREE.Vector3();
-  // yAxis = new THREE.Vector3();
-  // zAxis = new THREE.Vector3();
-
-  // pointer.matrix.extractBasis(xAxis, yAxis, zAxis);
-  //   console.log("");
-  //   console.log(zAxis);
-  //   console.log(
-  //     pointer.matrix.elements[2],
-  //     pointer.matrix.elements[6],
-  //     pointer.matrix.elements[10]
-  //   );
-
-  //   var vector = new THREE.Vector3(0, 0, 1);
-  //   vector.applyQuaternion(new THREE.Quaternion().setFromEuler(pointer.rotation));
-  //   pointer.rotation.setFromVector3(vector);
+  // pointer.lookAt(...multiplyPos(vec3ToArray(pointer.position), 2));
 
   const oldCameraPos = vec3ToArray(camera.position);
   const oldCameraRot = vec3ToArray(camera.rotation);
@@ -289,4 +227,95 @@ function onWindowResize() {
 function onMouseMove(event) {
   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
   mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+}
+
+function generateInfo(visible) {
+  if (visible) {
+    [...document.getElementsByTagName("span")].forEach(span => {
+      if (span.textContent == "generate")
+        generateRect = span.getBoundingClientRect();
+    });
+    document.getElementById("generate").style.visibility = "visible";
+    document.getElementById("generate").style.top = generateRect.top + 8 + "px";
+    document.getElementById("generate").style.left =
+      generateRect.left - 145 + "px";
+  } else {
+    document.getElementById("generate").style.visibility = "hidden";
+  }
+}
+
+function addNewNoise(density, height) {
+  name = "noise" + noiseNames.length;
+  variables[name + "Density"] = density;
+  folder5
+    .add(variables, name + "Density", 0.0, 10)
+    .step(0.01)
+    .onChange(() => {
+      generateInfo(true);
+    });
+
+  variables[name + "Height"] = height;
+  folder5
+    .add(variables, name + "Height", 0.0, 1.0)
+    .step(0.01)
+    .onChange(() => {
+      generateInfo(true);
+    });
+
+  noiseNames.push(name);
+
+  generateInfo(true);
+}
+
+function addNewColor(color, level) {
+  name = "color" + colorNames.length;
+  variables[name] = color;
+  folder3.addColor(variables, name).onChange(() => {
+    upDateColors();
+  });
+
+  variables[name + "Level"] = level;
+  folder3
+    .add(variables, name + "Level", 0.0, 1.0)
+    .step(0.01)
+    .onChange(() => {
+      upDateColors();
+    });
+
+  colorNames.push(name);
+}
+
+function sortedDictKeysFromVariables() {
+  const colors = {};
+  colorNames.forEach(name => {
+    colors[variables[name + "Level"]] = name;
+  });
+
+  const sortedColors = [];
+  Object.keys(colors)
+    .sort()
+    .forEach(key => {
+      sortedColors.push(colors[key]);
+    });
+  return sortedColors;
+}
+
+function randomize() {
+  variables.seed = Math.random() * 50;
+  simplex = new SimplexNoise(variables.seed);
+
+  for (let i = 0; i < colorNames.length; i++) {
+    variables[colorNames[i]] = [
+      Math.random() * 255,
+      Math.random() * 255,
+      Math.random() * 255
+    ];
+    variables[colorNames[i] + "Level"] = Math.random();
+  }
+  // upDateColors();
+
+  variables.maxLevel = Math.random();
+  variables.minLevel = Math.random() * variables.maxLevel - variables.maxLevel;
+
+  refreshIcosphere();
 }

@@ -31,21 +31,6 @@ function multiplyPos(position, value) {
   return [position[0] * value, position[1] * value, position[2] * value];
 }
 
-function sortedDictKeysFromVariables() {
-  const colors = {};
-  colorNames.forEach(name => {
-    colors[variables[name + "Level"]] = name;
-  });
-
-  const sortedColors = [];
-  Object.keys(colors)
-    .sort()
-    .forEach(key => {
-      sortedColors.push(colors[key]);
-    });
-  return sortedColors;
-}
-
 function color(height) {
   height = normalizeValue(height, variables.minLevel, variables.maxLevel);
   let sortedColors = sortedDictKeysFromVariables();
@@ -80,35 +65,6 @@ function color(height) {
       1
     )
   );
-}
-
-function addNewNoise(density, height) {
-  name = "noise" + noiseNames.length;
-  variables[name + "Density"] = density;
-  folder5.add(variables, name + "Density", 0.0, 10).step(0.01);
-
-  variables[name + "Height"] = height;
-  folder5.add(variables, name + "Height", 0.0, 1.0).step(0.01);
-
-  noiseNames.push(name);
-}
-
-function addNewColor(color, level) {
-  name = "color" + colorNames.length;
-  variables[name] = color;
-  folder3.addColor(variables, name).onChange(() => {
-    upDateColors();
-  });
-
-  variables[name + "Level"] = level;
-  folder3
-    .add(variables, name + "Level", 0.0, 1.0)
-    .step(0.01)
-    .onChange(() => {
-      upDateColors();
-    });
-
-  colorNames.push(name);
 }
 
 function normalizeValue(value, bottom, top) {
