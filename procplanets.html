@@ -87,6 +87,7 @@
       var folder1, folder2, folder3;
       var colorNames = [];
       var noiseNames = [];
+      var presets = {};
 
       var conPointer, camPointerHelper, conOrbit;
       var generateRect = {
@@ -131,17 +132,17 @@
             t1 = performance.now();
             console.log("RemoveDetail took " + (t1 - t0) + " milliseconds.");
           };
-          this.useTreeStruc = false;
 
           this.addNewColor = function() {
             addNewColor([212, 10, 10], Math.random());
+            refreshIcosphere();
           };
 
-          this.seed = 23;
+          this.seed = 41;
           this.addNewNoise = function() {
             addNewNoise(Math.random(), 1);
           };
-          this.maxLevel = 0.4;
+          this.maxLevel = 0.2;
           this.minLevel = 0;
           this.generate = () => {
             refreshIcosphere();
@@ -149,7 +150,20 @@
           };
 
           this.randomize = () => {
-            randomize();
+            setRandom();
+          };
+
+          this.Earth = () => {
+            setPreset(...presets.earth);
+          };
+          this.Sun = () => {
+            setPreset(...presets.sun);
+          };
+          this.Mars = () => {
+            if (colorNames.length < 4) {
+              addNewColor([0, 0, 0], 0);
+            }
+            setPreset(...presets.mars);
           };
         };
 
@@ -163,6 +177,7 @@
         folder4 = gui.addFolder("Terrain");
         folder5 = folder4.addFolder("Noise");
         folder6 = folder4.addFolder("Height");
+        folder7 = gui.addFolder("Presets");
         // folder2.open();
         folder3.open();
         folder4.open();
@@ -217,6 +232,10 @@
           .listen();
         folder4.add(variables, "generate");
 
+        folder7.add(variables, "Sun");
+        folder7.add(variables, "Earth");
+        folder7.add(variables, "Mars");
+
         return variables;
       }
 
@@ -258,12 +277,12 @@
         // camera = orgCamera;
 
         // Dat.GUI
-        addNewColor([59, 97, 188], 0.0);
-        addNewColor([210, 203, 94], 0.01);
-        addNewColor([71, 155, 53], 0.3);
-        addNewNoise(0.6, 1);
-        addNewNoise(1.3, 0.9);
-        addNewNoise(6, 0.2);
+        addNewColor([0, 0, 0], 0.0);
+        addNewColor([0, 0, 0], 0.0);
+        addNewColor([0, 0, 0], 0.0);
+        addNewNoise(0, 0);
+        addNewNoise(0, 0);
+        addNewNoise(0, 0);
         generateInfo(false);
 
         // Objects
@@ -288,6 +307,7 @@
         scene.add(pointer);
 
         initControls();
+        setPreset(...presets.earth);
       }
 
       // animation loop
@@ -327,23 +347,14 @@
         // variable which is increase by Math.PI every seconds - usefull for animation
         var PIseconds = Date.now() * Math.PI;
 
-        if (variables.useTreeStruc) {
-          LOD(
-            camera.position,
-            variables.tessConstant / 100,
-            variables.tessGive / 30,
-            variables.tessZoomIn,
-            variables.tessZoomOut
-          );
-        } else {
-          LODold(
-            camera.position,
-            variables.tessConstant / 100,
-            variables.tessGive / 30,
-            variables.tessZoomIn,
-            variables.tessZoomOut
-          );
-        }
+        LOD(
+          camera.position,
+          variables.tessConstant / 100,
+          variables.tessGive / 30,
+          variables.tessZoomIn,
+          variables.tessZoomOut
+        );
+
         if (colorsNeedUpdate) upDateColors();
 
         renderer.render(scene, camera);

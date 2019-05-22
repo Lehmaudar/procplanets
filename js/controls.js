@@ -19,11 +19,10 @@ function initControls() {
 
     // testing - p
     if (e.keyCode == 80) {
-      if (conOrbit.enabled) {
-        setPointerControls();
-      } else {
-        setOrbitControls();
-      }
+      if (onGround) setPointerControls();
+      // } else {
+      //   setOrbitControls();
+      // }
     }
 
     // camera travel - space
@@ -42,7 +41,43 @@ function initControls() {
 
   setupControls();
   setOrbitControls();
-  // setPointerControls();
+
+  presets.earth = [
+    41,
+    [
+      [[59, 97, 188], 0.0],
+      [[210, 203, 94], 0.01],
+      [[71, 155, 53], 0.2],
+      [[255, 255, 255], 1]
+    ],
+    [[0.6, 1], [1.3, 0.9], [6, 0.2]],
+    0.2,
+    0
+  ];
+  presets.sun = [
+    15,
+    [
+      [[240, 93, 13], 0.0],
+      [[210, 210, 28], 0.5],
+      [[255, 250, 229], 0.7],
+      [[255, 255, 255], 1]
+    ],
+    [[1, 1], [7.18, 0.7], [3, 0.7]],
+    0.01,
+    -0.01
+  ];
+  presets.mars = [
+    44,
+    [
+      [[195, 100, 34], 0],
+      [[188, 93, 43], 0.3],
+      [[233, 111, 27], 0.57],
+      [[110, 69, 63], 1]
+    ],
+    [[1, 0.8], [5, 0.2], [1.5, 0.3]],
+    0.01,
+    -0.01
+  ];
 }
 
 function toSky() {
@@ -300,22 +335,76 @@ function sortedDictKeysFromVariables() {
   return sortedColors;
 }
 
-function randomize() {
-  variables.seed = Math.random() * 50;
+function setRandom() {
+  const seed = Math.random() * 50;
+  const colors = [];
+  const noiseLayers = [];
+  const maxLevel = Math.random() * 0.5;
+  const minLevel = Math.random() * variables.maxLevel - variables.maxLevel;
+
+  for (_ in colorNames) {
+    colors.push([
+      [Math.random() * 255, Math.random() * 255, Math.random() * 255],
+      Math.random()
+    ]);
+  }
+
+  noiseStep = 0;
+  for (let i = 0; i < noiseNames.length; i++) {
+    noiseLayers.push([
+      (Math.random() * 10 * (i + 1)) / noiseNames.length,
+      Math.random() * (1 - i / noiseNames.length)
+    ]);
+  }
+
+  setPreset(seed, colors, noiseLayers, maxLevel, minLevel);
+}
+
+function setPreset(seed, colors, noiseLayers, maxLevel, minLevel) {
+  colors.sort((a, b) => {
+    return a[1] - b[1];
+  });
+  noiseLayers.sort((a, b) => {
+    return b[1] - a[1];
+  });
+
+  variables.seed = seed;
   simplex = new SimplexNoise(variables.seed);
 
   for (let i = 0; i < colorNames.length; i++) {
-    variables[colorNames[i]] = [
-      Math.random() * 255,
-      Math.random() * 255,
-      Math.random() * 255
-    ];
-    variables[colorNames[i] + "Level"] = Math.random();
+    if (i < colors.length) {
+      variables[colorNames[i]] = colors[i][0];
+      variables[colorNames[i] + "Level"] = colors[i][1];
+    } else {
+      variables[colorNames[i]] = [0, 0, 0];
+      variables[colorNames[i] + "Level"] = 1.1;
+    }
   }
-  // upDateColors();
 
-  variables.maxLevel = Math.random();
-  variables.minLevel = Math.random() * variables.maxLevel - variables.maxLevel;
+  for (let i = 0; i < noiseNames.length; i++) {
+    if (i < noiseLayers.length) {
+      variables[noiseNames[i] + "Density"] = noiseLayers[i][0];
+      variables[noiseNames[i] + "Height"] = noiseLayers[i][1];
+    } else {
+      variables[noiseNames[i] + "Density"] = 0;
+      variables[noiseNames[i] + "Height"] = 0;
+    }
+  }
 
+  variables.maxLevel = maxLevel;
+  variables.minLevel = minLevel;
+
+  function refreshGui(object) {
+    Object.keys(object.__folders).forEach(folderName => {
+      const folder = object.__folders[folderName];
+      Object.keys(folder.__controllers).forEach(controllerName => {
+        const controller = folder.__controllers[controllerName];
+        controller.updateDisplay();
+      });
+      refreshGui(folder);
+    });
+  }
+
+  refreshGui(gui);
   refreshIcosphere();
 }

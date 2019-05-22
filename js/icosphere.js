@@ -1,5 +1,6 @@
 var faceCache = [];
 var vertexCache = [];
+// var subCache = [];
 var geom;
 
 function noise(position) {
@@ -496,101 +497,6 @@ let lenCalcs = 0;
 let counter = 0;
 
 function LOD(
-  cameraPosVec,
-  tesselationConstant,
-  tessGive,
-  tessZoomIn,
-  tessZoomOut
-) {
-  counter += 1;
-  const cameraPos = vec3ToArray(cameraPosVec);
-
-  for (let i = 0; i < 20; i++) {
-    const startFace = faceCache[i];
-
-    LODRek(
-      startFace,
-      cameraPos,
-      tesselationConstant,
-      tessGive,
-      tessZoomIn,
-      tessZoomOut
-    );
-  }
-}
-
-function LODRek(
-  cacheFace,
-  cameraPos,
-  tesselationConstant,
-  tessGive,
-  tessZoomIn,
-  tessZoomOut
-) {
-  let pos = 0;
-  pos = cacheFace.middlePos;
-  pos = vec3ToArray(group.localToWorld(arrayToVec3(pos)));
-  const faceDist = distance(cameraPos, pos);
-  const minDepthEdgeLenghtView = Math.pow(0.5, cacheFace.minDepth) / faceDist;
-  const maxDepthEdgeLenghtView =
-    Math.pow(0.5, cacheFace.maxDepth - 1) / faceDist;
-  distCalcs += 1;
-  lenCalcs += 2;
-
-  if (tessZoomIn && minDepthEdgeLenghtView > tesselationConstant + tessGive) {
-    if (cacheFace.minDepth == cacheFace.depth) {
-      if (cacheFace.minDepth > cacheFace.depth && children.length == 0) {
-        throw new Error(
-          "MyError: minDepth can't be higher than depth if face \
-          does not have children"
-        );
-      }
-      subdivCacheFace(cacheFace);
-      geom.elementsNeedUpdate = true;
-    } else {
-      cacheFace.children.forEach(child => {
-        LODRek(
-          faceCache[child],
-          cameraPos,
-          tesselationConstant,
-          tessGive,
-          tessZoomIn,
-          tessZoomOut
-        );
-      });
-    }
-  } else if (
-    tessZoomOut &&
-    maxDepthEdgeLenghtView < tesselationConstant - tessGive
-  ) {
-    if (
-      cacheFace.children.length != 0 &&
-      cacheFace.maxDepth == faceCache[cacheFace.children[0]].depth &&
-      // alumisi ei tohiks vaja olla
-      faceCache[cacheFace.children[0]].isRendered &&
-      faceCache[cacheFace.children[1]].isRendered &&
-      faceCache[cacheFace.children[2]].isRendered &&
-      faceCache[cacheFace.children[3]].isRendered &&
-      !cacheFace.isRendered
-    ) {
-      undivCacheFace(cacheFace);
-      geom.elementsNeedUpdate = true;
-    } else {
-      cacheFace.children.forEach(child => {
-        LODRek(
-          faceCache[child],
-          cameraPos,
-          tesselationConstant,
-          tessGive,
-          tessZoomIn,
-          tessZoomOut
-        );
-      });
-    }
-  }
-}
-
-function LODold(
   cameraPosVec,
   tesselationConstant,
   tessGive,
