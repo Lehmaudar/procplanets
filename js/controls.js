@@ -1,5 +1,6 @@
 var downTweens = [];
 var upTweens = [];
+var closestDist;
 
 function initControls() {
   document.body.onkeyup = e => {
@@ -73,43 +74,37 @@ function toSky() {
     tween.stop();
   });
 
-  targetQuarternion = new THREE.Quaternion().copy(pointer.quaternion);
-  camera.quaternion.slerp(targetQuarternion, tweens.t);
+  firstTween = new TWEEN.Tween(camera.position)
+    .to(
+      { x: skyAxe.position.x, y: skyAxe.position.y, z: skyAxe.position.z },
+      1000
+    )
+    .onComplete(() => {
+      upPosTween.start();
+      upRotTween.start();
+      upFovTween.start();
+    });
+  upTweens.push(firstTween);
+  firstTween.start();
 
   upPosTween = new TWEEN.Tween(camera.position)
     .to({ x: skyPos.x, y: skyPos.y, z: skyPos.z }, 1000)
     .onComplete(() => {
-      // conOrbit.enabled = true;
-      // conPointer = new THREE.PointerLockControls(camera);
-      // conPointer.speedFactor = 0.1;
       setOrbitControls();
     });
   upTweens.push(upPosTween);
-  upPosTween.start();
 
-  // upRotTween = new TWEEN.Tween(camera.rotation).to(
-  //   { x: skyRot.x, y: skyRot.y, z: skyRot.z },
-  //   1000
-  // );
   upRotTween = new TWEEN.Tween(camera.rotation).to(
     { x: skyRot.x, y: skyRot.y, z: skyRot.z },
     1000
   );
   upTweens.push(upRotTween);
-  upRotTween.start();
 
   upFovTween = new TWEEN.Tween(camera).to({ fov: 15 }, 1000).onUpdate(() => {
     camera.updateProjectionMatrix();
   });
   upTweens.push(upFovTween);
-  upFovTween.start();
 }
-
-//TODO: travel aeg kasutades axe kaugust
-// targetQuarternion = new THREE.Quaternion().copy(pointer.quaternion);
-// camera.quaternion.slerp(targetQuarternion, tweens.t);
-//TODO: ease
-//TODO: slerp
 
 function toGround() {
   onGround = true;
@@ -132,29 +127,38 @@ function toGround() {
     ) {
       if (i == 1) closestIsFinal = true;
       else closestIsFinal = false;
+      closestDist = vecDistance(camera.position, skyAxeArray[i].position);
       closestAxePos = skyAxeArray[i].position;
     }
   }
 
-  axeTween = new TWEEN.Tween(camera.position)
-    .to({ x: closestAxePos.x, y: closestAxePos.y, z: closestAxePos.z }, 3000)
+  console.log(closestDist);
+
+  tetraTween = new TWEEN.Tween(camera.position)
+    .to(
+      { x: closestAxePos.x, y: closestAxePos.y, z: closestAxePos.z },
+      closestDist * 100
+    )
     .onUpdate(() => {
       camera.lookAt(new THREE.Vector3(0, 0, 0));
     })
     .onComplete(() => {
-      finalPosTween.start();
-      finalRotTween.start();
-      finalFovTween.start();
+      skyPosTween.start();
+      skyRotTween.start();
+      skyFovTween.start();
     });
-  downTweens.push(axeTween);
+  downTweens.push(tetraTween);
 
-  finalPosTween = new TWEEN.Tween(camera.position)
+  skyPosTween = new TWEEN.Tween(camera.position)
     .to(
-      { x: skyAxes.position.x, y: skyAxes.position.y, z: skyAxes.position.z },
+      { x: skyAxe.position.x, y: skyAxe.position.y, z: skyAxe.position.z },
       1000
     )
     .onStart(() => {
-      skyPos.copy(camera.position);
+      skyPos.copy(
+        new THREE.Vector3(...multiplyPos(vec3ToArray(camera.position), 4))
+      );
+      // skyPos.copy(camera.position);
       skyRot.copy(camera.rotation);
     })
     .onUpdate(() => {
@@ -164,25 +168,25 @@ function toGround() {
     .onComplete(() => {
       groundTween.start();
     });
-  downTweens.push(finalPosTween);
+  downTweens.push(skyPosTween);
 
-  finalFovTween = new TWEEN.Tween(camera).to({ fov: 60 }, 1000);
-  downTweens.push(finalFovTween);
+  skyFovTween = new TWEEN.Tween(camera).to({ fov: 60 }, 1000);
+  downTweens.push(skyFovTween);
 
-  finalRotTween = new TWEEN.Tween(camera.rotation).to(
+  skyRotTween = new TWEEN.Tween(camera.rotation).to(
     { x: -Math.PI / 2, y: 0, z: 0 },
     1000
   );
-  downTweens.push(finalRotTween);
+  downTweens.push(skyRotTween);
 
   var groundPos;
-  raycaster.set(skyAxes.position, new THREE.Vector3(0, -1, 0));
+  raycaster.set(skyAxe.position, new THREE.Vector3(0, -1, 0));
   raycaster.intersectObject(icosphere).forEach(intersection => {
     groundPos = intersection.point;
   });
 
   groundTween = new TWEEN.Tween(camera.position)
-    .to({ x: groundPos.x, y: groundPos.y + 0.005, z: groundPos.z }, 1000)
+    .to({ x: groundPos.x, y: groundPos.y + 0.01, z: groundPos.z }, 1000)
     .onStart(() => {
       // skyPos.copy(camera.position);
       // skyRot.copy(camera.rotation);
@@ -194,11 +198,11 @@ function toGround() {
   downTweens.push(groundTween);
 
   if (closestIsFinal) {
-    finalPosTween.start();
-    finalRotTween.start();
-    finalFovTween.start();
+    skyPosTween.start();
+    skyRotTween.start();
+    skyFovTween.start();
   } else {
-    axeTween.start();
+    tetraTween.start();
   }
 }
 

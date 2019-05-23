@@ -8,6 +8,7 @@
       content="width=device-width, user-scalable=no, minimum-scale=1.0,
       maximum-scale=1.0"
     />
+    <link rel="stylesheet" type="text/css" href="stylesheet.css" />
 
     <!-- External libraries from local machine (add http://procplanets.tintdisain.ee before each source) -->
     <script type="text/javascript" src="js/external/simplex-noise.js"></script>
@@ -31,30 +32,6 @@
     <!-- Project js files -->
     <script type="text/javascript" src="js/icosphere.js"></script>
     <script type="text/javascript" src="js/controls.js"></script>
-
-    <style>
-      body {
-        overflow: hidden;
-        padding: 0;
-        margin: 0;
-        color: #222;
-        background-color: #111;
-        font-family: arial;
-        font-size: 100%;
-      }
-
-      #generate {
-        position: fixed;
-        font-size: 12px;
-        height: 14px;
-        width: 200px;
-        top: 100px;
-        left: 100px;
-        color: white;
-        /* background-color: brown; */
-        visibility: hidden;
-      }
-    </style>
   </head>
   <body>
     <div id="generate">press to see changes →</div>
@@ -76,7 +53,7 @@
       var skyPos = new THREE.Vector3();
       var skyRot = new THREE.Euler();
       var orgRot = new THREE.Euler();
-      var skyAxes;
+      var skyAxe;
       var testVec = new THREE.Vector3(0, 0, 0);
       var target = new THREE.Vector3(3, -6, 6); // create on init
       var downTween, upTween;
@@ -293,16 +270,16 @@
         group.add(icosphere);
         scene.add(group);
 
-        skyAxes = new THREE.AxesHelper(0.3);
-        skyAxes.position.set(0, 2.8, 0);
-        icosphere.add(skyAxes);
+        skyAxe = new THREE.AxesHelper(0.3);
+        skyAxe.position.set(0, 2.8, 0);
+        // icosphere.add(skyAxe);
 
         axes = new THREE.AxesHelper(2);
         axes.visible = false;
         icosphere.add(axes);
 
         tetra = new THREE.Mesh(
-          new THREE.TetrahedronGeometry(2.8),
+          new THREE.TetrahedronGeometry(3.4),
           new THREE.MeshBasicMaterial({ color: 0x009900, wireframe: true })
         );
         // icosphere.add(tetra);
