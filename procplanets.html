@@ -35,6 +35,17 @@
   </head>
   <body>
     <div id="generate">press to see changes →</div>
+    <div id="info">
+      <div class="line" id="travel">
+        <span class="key">space</span> to travel to ground/sky
+      </div>
+      <div class="line" id="enterpointer">
+        <span class="key">P</span> to enter pointercontrols
+      </div>
+      <div class="line" id="exitpointer">
+        <span class="key">ESC</span> to exit pointercontrols
+      </div>
+    </div>
     <script type="text/javascript">
       var scene, renderer, composer, camera, icosphere, axes;
       var stats, gui, cameraControls, keyboard;
@@ -48,6 +59,7 @@
       var trackballControls, pointerLockControls, pointer;
       var raycaster = new THREE.Raycaster();
       var mouse = new THREE.Vector2();
+      var goingToGround = false;
       var onGround = false;
 
       var skyPos = new THREE.Vector3();
@@ -78,145 +90,6 @@
 
       init();
       animate();
-
-      // dat.gui ui
-      function datGui() {
-        var Variables = function() {
-          this.wireframe = false;
-          this.axes = false;
-          this.vertexColors = true;
-
-          this.tessConstant = 12;
-          this.tessGive = 0;
-          this.tessZoomIn = false;
-          this.tessZoomOut = false;
-          this.addDetail = () => {
-            t0 = performance.now();
-            addDetail(faceCache);
-            icosphere.geometry.elementsNeedUpdate = true;
-            t1 = performance.now();
-            console.log("AddDetail took " + (t1 - t0) + " milliseconds.");
-          };
-          this.addDetailOptimized = () => {
-            t0 = performance.now();
-            addDetail(findVisibleFaces(faceCache));
-            icosphere.geometry.elementsNeedUpdate = true;
-            t1 = performance.now();
-            console.log("AddDetail took " + (t1 - t0) + " milliseconds.");
-          };
-          this.removeDetail = () => {
-            t0 = performance.now();
-            removeDetail();
-            icosphere.geometry.elementsNeedUpdate = true;
-            t1 = performance.now();
-            console.log("RemoveDetail took " + (t1 - t0) + " milliseconds.");
-          };
-
-          this.addNewColor = function() {
-            addNewColor([212, 10, 10], Math.random());
-            refreshIcosphere();
-          };
-
-          this.seed = 41;
-          this.addNewNoise = function() {
-            addNewNoise(Math.random(), 1);
-          };
-          this.maxLevel = 0.2;
-          this.minLevel = 0;
-          this.generate = () => {
-            refreshIcosphere();
-            generateInfo(false);
-          };
-
-          this.randomize = () => {
-            setRandom();
-          };
-
-          this.Earth = () => {
-            setPreset(...presets.earth);
-          };
-          this.Sun = () => {
-            setPreset(...presets.sun);
-          };
-          this.Mars = () => {
-            if (colorNames.length < 4) {
-              addNewColor([0, 0, 0], 0);
-            }
-            setPreset(...presets.mars);
-          };
-        };
-
-        variables = new Variables();
-        gui = new dat.GUI();
-
-        gui.add(variables, "randomize");
-        folder1 = gui.addFolder("Appearance");
-        folder2 = gui.addFolder("Tesselation");
-        folder3 = gui.addFolder("Colors");
-        folder4 = gui.addFolder("Terrain");
-        folder5 = folder4.addFolder("Noise");
-        folder6 = folder4.addFolder("Height");
-        folder7 = gui.addFolder("Presets");
-        // folder2.open();
-        folder3.open();
-        folder4.open();
-        folder5.open();
-        folder6.open();
-
-        folder2.add(variables, "tessConstant", 0.01, 20);
-        // folder2.add(variables, "tessGive", 0, 10);
-        folder2.add(variables, "tessZoomIn");
-        // folder2.add(variables, "tessZoomOut");
-        // folder2.add(variables, "useTreeStruc");
-        folder2.add(variables, "addDetail");
-        folder2.add(variables, "addDetailOptimized");
-        folder2.add(variables, "removeDetail");
-        folder1.add(variables, "wireframe").onChange(value => {
-          icosphere.material.wireframe = value;
-        });
-        folder1.add(variables, "axes").onChange(value => {
-          value ? (axes.visible = true) : (axes.visible = false);
-        });
-        folder1.add(variables, "vertexColors").onChange(value => {
-          value
-            ? (icosphere.material.vertexColors = 1)
-            : (icosphere.material.vertexColors = 0);
-          icosphere.material.needsUpdate = true;
-        });
-
-        folder3.add(variables, "addNewColor");
-
-        folder5.add(variables, "seed", 0, 50).onChange(value => {
-          simplex = new SimplexNoise(value);
-          generateInfo(true);
-        });
-        folder5.add(variables, "addNewNoise");
-        folder6
-          .add(variables, "maxLevel", 0.01, 1)
-          .step(0.01)
-          .onChange(value => {
-            if (value < Math.abs(variables.minLevel))
-              variables.minLevel = -variables.maxLevel;
-            generateInfo(true);
-          });
-
-        folder6
-          .add(variables, "minLevel", -1, 0)
-          .step(0.01)
-          .onChange(value => {
-            if (Math.abs(value) > variables.maxLevel)
-              variables.minLevel = -variables.maxLevel;
-            generateInfo(true);
-          })
-          .listen();
-        folder4.add(variables, "generate");
-
-        folder7.add(variables, "Sun");
-        folder7.add(variables, "Earth");
-        folder7.add(variables, "Mars");
-
-        return variables;
-      }
 
       // init the scene
       function init() {
@@ -271,7 +144,7 @@
         scene.add(group);
 
         skyAxe = new THREE.AxesHelper(0.3);
-        skyAxe.position.set(0, 2.8, 0);
+        skyAxe.position.set(0, 2, 0);
         // icosphere.add(skyAxe);
 
         axes = new THREE.AxesHelper(2);
@@ -279,7 +152,7 @@
         icosphere.add(axes);
 
         tetra = new THREE.Mesh(
-          new THREE.TetrahedronGeometry(3.4),
+          new THREE.TetrahedronGeometry(6),
           new THREE.MeshBasicMaterial({ color: 0x009900, wireframe: true })
         );
         // icosphere.add(tetra);
@@ -314,6 +187,7 @@
           smootherControls(delta);
           // conOrbit.update();
         }
+        updateInfo();
 
         TWEEN.update();
 

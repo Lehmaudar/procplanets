@@ -37,6 +37,9 @@ function color(height) {
   let sortedColors = sortedDictKeysFromVariables();
 
   for (let i = 0; i < sortedColors.length; i++) {
+    if (Math.random() > 0.5) {
+      height += 0.0001;
+    }
     if (height < variables[sortedColors[i] + "Level"]) {
       if (i == 0) {
         baseLevel = -1;
@@ -532,8 +535,6 @@ function LOD(
       ) {
         subdivCacheFace(cacheFace);
         geom.elementsNeedUpdate = true;
-        // } else if (tessZoomOut && !cacheFace.isRendered) {
-        //   console.log(900);
       } else if (
         tessZoomOut &&
         !cacheFace.isRendered &&
@@ -609,7 +610,6 @@ function normalizeVertex(cacheVertex) {
     if (cacheVertex.normalizedPos == undefined) {
       vertex.normalize();
       cacheVertex.normalizedNoise = noise(vec3ToArray(vertex));
-      // console.log(cacheVertex.normalizedNoise);
       cacheVertex.water;
       cacheVertex.normalizedPos = [
         vertex.x * (cacheVertex.normalizedNoise + 1),

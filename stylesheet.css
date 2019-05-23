@@ -16,6 +16,28 @@ body {
   top: 100px;
   left: 100px;
   color: white;
-  /* background-color: brown; */
   visibility: hidden;
+}
+
+#info {
+  position: fixed;
+  font-size: 12px;
+  bottom: 60px;
+  left: 60px;
+  color: white;
+  display: grid;
+  grid-template-columns: 1fr;
+}
+
+.key {
+  background: #f8f9ed;
+  border: 1px solid #d1d1c0;
+  color: #62674c;
+  border-radius: 4px;
+  padding: 2px 4px;
+  margin: 0 2px;
+}
+
+.line {
+  margin-top: 16px;
 }

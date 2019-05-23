@@ -1,8 +1,19 @@
 var downTweens = [];
 var upTweens = [];
 var closestDist;
+var curvePoints;
+var splineTweens = {
+  t: 0,
+  fov: 15
+};
 
 function initControls() {
+  splineMesh = new THREE.Line(
+    new THREE.Geometry(),
+    new THREE.LineBasicMaterial({ color: 0x00ff00 })
+  );
+  // scene.add(splineMesh);
+
   document.body.onkeyup = e => {
     // culling - f
     if (e.keyCode == 70) {
@@ -22,12 +33,12 @@ function initControls() {
     }
 
     // testing - p
-    if (e.keyCode == 80) setPointerControls();
-    if (e.keyCode == 79) setOrbitControls();
+    if (e.keyCode == 80 && goingToGround) setPointerControls();
+    if (e.keyCode == 79 && !goingToGround) setOrbitControls();
 
     // camera travel - space
     if (e.keyCode == 32) {
-      if (onGround) toSky();
+      if (goingToGround) toSky();
       else toGround();
     }
   };
@@ -65,7 +76,7 @@ function initControls() {
 }
 
 function toSky() {
-  onGround = false;
+  goingToGround = false;
 
   setOrbitControls();
   conOrbit.enabled = false;
@@ -74,44 +85,37 @@ function toSky() {
     tween.stop();
   });
 
-  firstTween = new TWEEN.Tween(camera.position)
-    .to(
-      { x: skyAxe.position.x, y: skyAxe.position.y, z: skyAxe.position.z },
-      1000
-    )
+  const splineRotTween = new TWEEN.Tween(camera.rotation)
+    .to({ x: -Math.PI / 2, y: 0, z: 0 }, 2000)
+    .easing(TWEEN.Easing.Cubic.InOut)
     .onComplete(() => {
-      upPosTween.start();
-      upRotTween.start();
-      upFovTween.start();
+      splineTween.start();
     });
-  upTweens.push(firstTween);
-  firstTween.start();
 
-  upPosTween = new TWEEN.Tween(camera.position)
-    .to({ x: skyPos.x, y: skyPos.y, z: skyPos.z }, 1000)
+  const splineTween = new TWEEN.Tween(splineTweens)
+    .to({ t: 0, fov: 15 }, 2000)
+    .easing(TWEEN.Easing.Sinusoidal.InOut)
+    .onUpdate(() => {
+      camera.position.copy(curvePoints[Math.trunc(splineTweens.t)]);
+      camera.lookAt(new THREE.Vector3(0, 0, 0));
+      camera.fov = splineTweens.fov;
+      camera.updateProjectionMatrix();
+    })
     .onComplete(() => {
       setOrbitControls();
     });
-  upTweens.push(upPosTween);
 
-  upRotTween = new TWEEN.Tween(camera.rotation).to(
-    { x: skyRot.x, y: skyRot.y, z: skyRot.z },
-    1000
-  );
-  upTweens.push(upRotTween);
+  upTweens.push(splineRotTween);
+  upTweens.push(splineTween);
 
-  upFovTween = new TWEEN.Tween(camera).to({ fov: 15 }, 1000).onUpdate(() => {
-    camera.updateProjectionMatrix();
-  });
-  upTweens.push(upFovTween);
+  if (onGround) splineRotTween.start();
+  else splineTween.start();
+
+  onGround = false;
 }
 
 function toGround() {
-  onGround = true;
-  if (upTween == undefined || !upTween._isPlaying) {
-    skyPos.copy(camera.position);
-    skyRot.copy(camera.rotation);
-  }
+  goingToGround = true;
 
   upTweens.forEach(tween => {
     tween.stop();
@@ -132,86 +136,66 @@ function toGround() {
     }
   }
 
-  console.log(closestDist);
-
-  tetraTween = new TWEEN.Tween(camera.position)
-    .to(
-      { x: closestAxePos.x, y: closestAxePos.y, z: closestAxePos.z },
-      closestDist * 100
-    )
-    .onUpdate(() => {
-      camera.lookAt(new THREE.Vector3(0, 0, 0));
-    })
-    .onComplete(() => {
-      skyPosTween.start();
-      skyRotTween.start();
-      skyFovTween.start();
-    });
-  downTweens.push(tetraTween);
-
-  skyPosTween = new TWEEN.Tween(camera.position)
-    .to(
-      { x: skyAxe.position.x, y: skyAxe.position.y, z: skyAxe.position.z },
-      1000
-    )
-    .onStart(() => {
-      skyPos.copy(
-        new THREE.Vector3(...multiplyPos(vec3ToArray(camera.position), 4))
-      );
-      // skyPos.copy(camera.position);
-      skyRot.copy(camera.rotation);
-    })
-    .onUpdate(() => {
-      camera.lookAt(new THREE.Vector3(0, 0, 0));
-      camera.updateProjectionMatrix();
-    })
-    .onComplete(() => {
-      groundTween.start();
-    });
-  downTweens.push(skyPosTween);
-
-  skyFovTween = new TWEEN.Tween(camera).to({ fov: 60 }, 1000);
-  downTweens.push(skyFovTween);
-
-  skyRotTween = new TWEEN.Tween(camera.rotation).to(
-    { x: -Math.PI / 2, y: 0, z: 0 },
-    1000
-  );
-  downTweens.push(skyRotTween);
-
   var groundPos;
   raycaster.set(skyAxe.position, new THREE.Vector3(0, -1, 0));
   raycaster.intersectObject(icosphere).forEach(intersection => {
     groundPos = intersection.point;
   });
+  groundPos.x = groundPos.x += 0.01;
 
-  groundTween = new TWEEN.Tween(camera.position)
-    .to({ x: groundPos.x, y: groundPos.y + 0.01, z: groundPos.z }, 1000)
-    .onStart(() => {
-      // skyPos.copy(camera.position);
-      // skyRot.copy(camera.rotation);
+  // prettier-ignore
+  var points = [
+    camera.position,
+    closestAxePos,
+    new THREE.Vector3(
+      ...multiplyPos(
+        midPosOf2Verts(vec3ToArray(skyAxe.position),
+        midPosOf2Verts(vec3ToArray(skyAxe.position),
+        midPosOf2Verts(vec3ToArray(skyAxe.position),
+                       vec3ToArray(closestAxePos)))),
+        1.5
+      )
+    ),
+    groundPos
+  ];
+  var curve = new THREE.CatmullRomCurve3(points);
+  curvePoints = curve.getPoints(8000);
+  // splineMesh.spline = curve;
+  // splineMesh.geometry.vertices = curve.getPoints(40);
+  // splineMesh.geometry.verticesNeedUpdate = true;
+
+  const splineTween = new TWEEN.Tween(splineTweens)
+    .to({ t: 8000, fov: 60 }, 2000)
+    .easing(TWEEN.Easing.Sinusoidal.InOut)
+    .onUpdate(() => {
+      camera.position.copy(curvePoints[Math.trunc(splineTweens.t)]);
+      camera.lookAt(new THREE.Vector3(0, 0, 0));
+      camera.fov = splineTweens.fov;
+      camera.updateProjectionMatrix();
     })
     .onComplete(() => {
-      // setOrbitControls();
-      setPointerControls();
+      splineRotTween.start();
     });
-  downTweens.push(groundTween);
+  splineTween.start();
 
-  if (closestIsFinal) {
-    skyPosTween.start();
-    skyRotTween.start();
-    skyFovTween.start();
-  } else {
-    tetraTween.start();
-  }
+  const splineRotTween = new TWEEN.Tween(camera.rotation)
+    .to({ x: 0, y: Math.PI / 2, z: 0 }, 1000)
+    .easing(TWEEN.Easing.Cubic.InOut)
+    .onComplete(() => {
+      setPointerControls();
+      updateInfo();
+      onGround = true;
+      goingToGround = true;
+    });
+
+  downTweens.push(splineRotTween);
+  downTweens.push(splineTween);
 }
 
 function setupControls() {
   conPointer = new THREE.PointerLockControls(orgCamera);
   conPointer.speedFactor = 0.1;
   camera = conPointer.getObject();
-  // camera.rotation.set(0, 1, 0);
-  // camera.position.set(0, 10, 15);
 
   conOrbit = new THREE.TrackballControls(camera, renderer.domElement);
   conOrbit.maxDistance = 40;
@@ -220,27 +204,21 @@ function setupControls() {
 
 function setPointerControls() {
   conPointer.lock();
+  conPointer.isLocked = false;
   conOrbit.enabled = false;
 }
 
 function setOrbitControls() {
   conPointer.unlock();
   conOrbit.enabled = true;
-  // controls = conOrbit;
 }
 
 var asd = 0;
 
 function smootherControls() {
-  // pointer.lookAt(0, 0, 0);
-  // pointer.lookAt(...multiplyPos(vec3ToArray(pointer.position), 2));
-
   const oldCameraPos = vec3ToArray(camera.position);
   const oldCameraRot = vec3ToArray(camera.rotation);
   const oldCameraDist = distance(oldCameraPos, [0, 0, 0]);
-
-  const oldTargetPos = vec3ToArray(conOrbit.target);
-  const oldTargetDist = distance(oldTargetPos, [0, 0, 0]);
 
   // dist, startvalue, startvalue + endvalue, endDist
   ease = easeFunc(oldCameraDist - 1, 0, 1, 40);
@@ -288,6 +266,15 @@ function generateInfo(visible) {
   } else {
     document.getElementById("generate").style.visibility = "hidden";
   }
+}
+
+function updateInfo() {
+  if (conPointer.isLocked && onGround)
+    document.getElementById("exitpointer").style.opacity = "1";
+  else document.getElementById("exitpointer").style.opacity = "0.1";
+  if (!conPointer.isLocked && onGround)
+    document.getElementById("enterpointer").style.opacity = "1";
+  else document.getElementById("enterpointer").style.opacity = "0.1";
 }
 
 function addNewNoise(density, height) {
@@ -418,4 +405,143 @@ function setPreset(seed, colors, noiseLayers, maxLevel, minLevel) {
 
   refreshGui(gui);
   refreshIcosphere();
+}
+
+// dat.gui ui
+function datGui() {
+  var Variables = function() {
+    this.wireframe = false;
+    this.axes = false;
+    this.vertexColors = true;
+
+    this.tessConstant = 12;
+    this.tessGive = 0;
+    this.tessZoomIn = false;
+    this.tessZoomOut = false;
+    this.addDetail = () => {
+      t0 = performance.now();
+      addDetail(faceCache);
+      icosphere.geometry.elementsNeedUpdate = true;
+      t1 = performance.now();
+      console.log("AddDetail took " + (t1 - t0) + " milliseconds.");
+    };
+    this.addDetailOptimized = () => {
+      t0 = performance.now();
+      addDetail(findVisibleFaces(faceCache));
+      icosphere.geometry.elementsNeedUpdate = true;
+      t1 = performance.now();
+      console.log("AddDetailOpt took " + (t1 - t0) + " milliseconds.");
+    };
+    this.removeDetail = () => {
+      t0 = performance.now();
+      removeDetail();
+      icosphere.geometry.elementsNeedUpdate = true;
+      t1 = performance.now();
+      console.log("RemoveDetail took " + (t1 - t0) + " milliseconds.");
+    };
+
+    this.addNewColor = function() {
+      addNewColor([212, 10, 10], Math.random());
+      refreshIcosphere();
+    };
+
+    this.seed = 41;
+    this.addNewNoise = function() {
+      addNewNoise(Math.random(), 1);
+    };
+    this.maxLevel = 0.2;
+    this.minLevel = 0;
+    this.generate = () => {
+      refreshIcosphere();
+      generateInfo(false);
+    };
+
+    this.randomize = () => {
+      setRandom();
+    };
+
+    this.Earth = () => {
+      setPreset(...presets.earth);
+    };
+    this.Sun = () => {
+      setPreset(...presets.sun);
+    };
+    this.Mars = () => {
+      if (colorNames.length < 4) {
+        addNewColor([0, 0, 0], 0);
+      }
+      setPreset(...presets.mars);
+    };
+  };
+
+  variables = new Variables();
+  gui = new dat.GUI();
+
+  gui.add(variables, "randomize");
+  folder1 = gui.addFolder("Appearance");
+  folder2 = gui.addFolder("Tesselation");
+  folder3 = gui.addFolder("Colors");
+  folder4 = gui.addFolder("Terrain");
+  folder5 = folder4.addFolder("Noise");
+  folder6 = folder4.addFolder("Height");
+  folder7 = gui.addFolder("Presets");
+  // folder2.open();
+  folder3.open();
+  folder4.open();
+  folder5.open();
+  folder6.open();
+
+  folder2.add(variables, "tessConstant", 0.01, 20);
+  // folder2.add(variables, "tessGive", 0, 10);
+  folder2.add(variables, "tessZoomIn");
+  // folder2.add(variables, "tessZoomOut");
+  // folder2.add(variables, "useTreeStruc");
+  folder2.add(variables, "addDetail");
+  folder2.add(variables, "addDetailOptimized");
+  folder2.add(variables, "removeDetail");
+  folder1.add(variables, "wireframe").onChange(value => {
+    icosphere.material.wireframe = value;
+  });
+  folder1.add(variables, "axes").onChange(value => {
+    value ? (axes.visible = true) : (axes.visible = false);
+  });
+  folder1.add(variables, "vertexColors").onChange(value => {
+    value
+      ? (icosphere.material.vertexColors = 1)
+      : (icosphere.material.vertexColors = 0);
+    icosphere.material.needsUpdate = true;
+  });
+
+  folder3.add(variables, "addNewColor");
+
+  folder5.add(variables, "seed", 0, 50).onChange(value => {
+    simplex = new SimplexNoise(value);
+    generateInfo(true);
+  });
+  folder5.add(variables, "addNewNoise");
+  folder6
+    .add(variables, "maxLevel", 0.01, 1)
+    .step(0.01)
+    .onChange(value => {
+      if (value < Math.abs(variables.minLevel))
+        variables.minLevel = -variables.maxLevel;
+      generateInfo(true);
+    });
+
+  folder6
+    .add(variables, "minLevel", -1, 0)
+    .step(0.01)
+    .onChange(value => {
+      if (Math.abs(value) > variables.maxLevel)
+        variables.minLevel = -variables.maxLevel;
+      generateInfo(true);
+    })
+    .listen();
+  folder4.add(variables, "generate");
+
+  folder7.add(variables, "Sun");
+  folder7.add(variables, "Earth");
+  folder7.add(variables, "Mars");
+
+  return variables;
 }
