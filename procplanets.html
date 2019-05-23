@@ -10,7 +10,8 @@
     />
     <link rel="stylesheet" type="text/css" href="stylesheet.css" />
 
-    <!-- External libraries from local machine (add http://procplanets.tintdisain.ee before each source) -->
+    <!-- External libraries from local machine
+    (add http://procplanets.tintdisain.ee before each source to use server) -->
     <script type="text/javascript" src="js/external/simplex-noise.js"></script>
     <script type="text/javascript" src="js/external/three.r96.js"></script>
     <script type="text/javascript" src="js/external/stats.min.js"></script>
@@ -46,29 +47,23 @@
         <span class="key">ESC</span> to exit pointercontrols
       </div>
     </div>
+
     <script type="text/javascript">
-      var scene, renderer, composer, camera, icosphere, axes;
+      var scene, renderer, camera, icosphere, axes;
       var stats, gui, cameraControls, keyboard;
       var variables = datGui();
-      var mouseSpeed = 0;
-      var zoomSpeed;
-      var clock = new THREE.Clock();
       var keyboard = new THREEx.KeyboardState();
       var simplex = new SimplexNoise(variables.seed);
 
       var trackballControls, pointerLockControls, pointer;
-      var raycaster = new THREE.Raycaster();
-      var mouse = new THREE.Vector2();
       var goingToGround = false;
       var onGround = false;
+      var inSky = true;
 
-      var skyPos = new THREE.Vector3();
-      var skyRot = new THREE.Euler();
-      var orgRot = new THREE.Euler();
-      var skyAxe;
-      var testVec = new THREE.Vector3(0, 0, 0);
-      var target = new THREE.Vector3(3, -6, 6); // create on init
-      var downTween, upTween;
+      // var skyAxe;
+      // var testVec = new THREE.Vector3(0, 0, 0);
+      // var target = new THREE.Vector3(3, -6, 6); // create on init
+      // var downTween, upTween;
 
       var frustum = new THREE.Frustum();
       var cameraVector = new THREE.Vector3();
@@ -94,7 +89,8 @@
       // init the scene
       function init() {
         renderer = new THREE.WebGLRenderer({
-          antialias: true
+          antialias: true,
+          logarithmicDepthBuffer: true
         });
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
@@ -117,17 +113,6 @@
         // create a scene
         scene = new THREE.Scene();
 
-        // put a camera in the scene
-        orgCamera = new THREE.PerspectiveCamera(
-          15,
-          window.innerWidth / window.innerHeight,
-          0.001,
-          10000
-        );
-        orgCamera.position.set(0, 0, 15);
-        // scene.add(orgCamera);
-        // camera = orgCamera;
-
         // Dat.GUI
         addNewColor([0, 0, 0], 0.0);
         addNewColor([0, 0, 0], 0.0);
@@ -145,9 +130,8 @@
 
         skyAxe = new THREE.AxesHelper(0.3);
         skyAxe.position.set(0, 2, 0);
-        // icosphere.add(skyAxe);
 
-        axes = new THREE.AxesHelper(2);
+        axes = new THREE.AxesHelper(100);
         axes.visible = false;
         icosphere.add(axes);
 
@@ -155,7 +139,6 @@
           new THREE.TetrahedronGeometry(6),
           new THREE.MeshBasicMaterial({ color: 0x009900, wireframe: true })
         );
-        // icosphere.add(tetra);
         tetra.rotation.set(-Math.PI / 3.3, Math.PI / 4, Math.PI / 2);
 
         skyAxeArray = [];
@@ -167,11 +150,7 @@
           tetraAxe = new THREE.AxesHelper(0.3);
           tetraAxe.position.copy(vector);
           skyAxeArray.push(tetraAxe);
-          // icosphere.add(tetraAxe);
         }
-
-        // Raycaster
-        raycaster = new THREE.Raycaster();
 
         initControls();
         setPreset(...presets.earth);
@@ -180,30 +159,11 @@
       // animation loop
       function animate() {
         requestAnimationFrame(animate);
-        delta = clock.getDelta();
 
         // update camera controls
-        if (conOrbit != undefined && conOrbit.enabled) {
-          smootherControls(delta);
-          // conOrbit.update();
-        }
-        updateInfo();
+        if (conOrbit != undefined && conOrbit.enabled) smootherControls();
 
-        TWEEN.update();
-
-        // focus on canvas in case gui has been pressed
-        // renderer.domElement.setAttribute("tabIndex", "0");
-        // renderer.domElement.focus();
-
-        render();
-
-        stats.update();
-      }
-
-      function render() {
-        // variable which is increase by Math.PI every seconds - usefull for animation
-        var PIseconds = Date.now() * Math.PI;
-
+        // dynamic tesselation
         LOD(
           camera.position,
           variables.tessConstant / 100,
@@ -213,7 +173,14 @@
         );
 
         if (colorsNeedUpdate) upDateColors();
+        updateInfo();
+        TWEEN.update();
+        render();
 
+        stats.update();
+      }
+
+      function render() {
         renderer.render(scene, camera);
       }
     </script>

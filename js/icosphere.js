@@ -115,10 +115,10 @@ function initIcosphere() {
   var mesh = new THREE.Mesh(geom, mat);
   mesh.name = "Icosphere";
 
-  addDetail(faceCache);
-  addDetail(faceCache);
-  addDetail(faceCache);
-  addDetail(faceCache);
+  addDetail(faceCache, false);
+  addDetail(faceCache, false);
+  addDetail(faceCache, false);
+  addDetail(faceCache, false);
 
   return mesh;
 }
@@ -135,10 +135,10 @@ function refreshIcosphere() {
 
   createIcosaherdron();
 
-  addDetail(faceCache);
-  addDetail(faceCache);
-  addDetail(faceCache);
-  addDetail(faceCache);
+  addDetail(faceCache, false);
+  addDetail(faceCache, false);
+  addDetail(faceCache, false);
+  addDetail(faceCache, false);
 }
 
 function createIcosaherdron() {
@@ -200,8 +200,6 @@ function createIcosaherdron() {
 }
 
 function findNeighbours(cacheFace) {
-  // return [];
-
   const parent = faceCache[cacheFace.parent];
   if (parent == undefined) return [];
   return faceCache.filter(face => {
@@ -333,12 +331,12 @@ function createFace(cacheVertices, parent) {
   return cacheIndex;
 }
 
-function addDetail(faces) {
+function addDetail(faces, neighbours) {
   faces
     .filter(face => face.isRendered)
     .forEach(face => {
       if (face.isRendered) {
-        subdivCacheFace(face);
+        subdivCacheFace(face, neighbours);
       }
     });
 }
@@ -359,14 +357,15 @@ function removeDetail() {
     });
 }
 
-function subdivCacheFace(cacheFace) {
+function subdivCacheFace(cacheFace, neighbours) {
   cacheFace.maxDepth += 1;
   cacheFace.minDepth += 1;
   increaseTreeDepth(cacheFace);
 
-  findNeighbours(cacheFace).forEach(face => {
-    subdivCacheFace(face);
-  });
+  if (neighbours)
+    findNeighbours(cacheFace).forEach(face => {
+      subdivCacheFace(face, neighbours);
+    });
 
   if (cacheFace.children.length == 0) {
     const cacheIndex = cacheFace.cacheIndex;
@@ -533,7 +532,7 @@ function LOD(
         cacheFace.isRendered &&
         faceEdgeLenght > tesselationConstant + tessGive
       ) {
-        subdivCacheFace(cacheFace);
+        subdivCacheFace(cacheFace, true);
         geom.elementsNeedUpdate = true;
       } else if (
         tessZoomOut &&

@@ -6,17 +6,17 @@ var splineTweens = {
   t: 0,
   fov: 15
 };
+const travelTime = 2000;
 
 function initControls() {
   splineMesh = new THREE.Line(
     new THREE.Geometry(),
     new THREE.LineBasicMaterial({ color: 0x00ff00 })
   );
-  // scene.add(splineMesh);
 
   document.body.onkeyup = e => {
     // culling - f
-    if (e.keyCode == 70) {
+    if (e.keyCode == 85) {
       updateFrustum();
       updateCullingVectors();
       findVisibleFaces(faceCache).forEach(face => {
@@ -26,7 +26,7 @@ function initControls() {
     }
 
     // update colors - s
-    if (e.keyCode == 83) upDateColors();
+    if (e.keyCode == 89) upDateColors();
 
     // testing - i
     if (e.keyCode == 73) {
@@ -38,8 +38,8 @@ function initControls() {
 
     // camera travel - space
     if (e.keyCode == 32) {
-      if (goingToGround) toSky();
-      else toGround();
+      if (onGround) toSky();
+      else if (inSky) toGround();
     }
   };
 
@@ -53,7 +53,7 @@ function initControls() {
       [[210, 203, 94], 0.01],
       [[71, 155, 53], 0.2],
       [[255, 255, 255], 1] ],
-      [[0.6, 1], [1.3, 0.9], [6, 0.2]], 0.2, 0
+      [[0.6, 1], [1.3, 0.9], [6, 0.2]], 0.3, 0
   ];
   // prettier-ignore
   presets.sun = [
@@ -86,14 +86,14 @@ function toSky() {
   });
 
   const splineRotTween = new TWEEN.Tween(camera.rotation)
-    .to({ x: -Math.PI / 2, y: 0, z: 0 }, 2000)
+    .to({ x: -Math.PI / 2, y: 0, z: 0 }, travelTime)
     .easing(TWEEN.Easing.Cubic.InOut)
     .onComplete(() => {
       splineTween.start();
     });
 
   const splineTween = new TWEEN.Tween(splineTweens)
-    .to({ t: 0, fov: 15 }, 2000)
+    .to({ t: 0, fov: 15 }, travelTime)
     .easing(TWEEN.Easing.Sinusoidal.InOut)
     .onUpdate(() => {
       camera.position.copy(curvePoints[Math.trunc(splineTweens.t)]);
@@ -103,6 +103,7 @@ function toSky() {
     })
     .onComplete(() => {
       setOrbitControls();
+      inSky = true;
     });
 
   upTweens.push(splineRotTween);
@@ -116,6 +117,7 @@ function toSky() {
 
 function toGround() {
   goingToGround = true;
+  inSky = false;
 
   upTweens.forEach(tween => {
     tween.stop();
@@ -137,11 +139,12 @@ function toGround() {
   }
 
   var groundPos;
+  const raycaster = new THREE.Raycaster();
   raycaster.set(skyAxe.position, new THREE.Vector3(0, -1, 0));
   raycaster.intersectObject(icosphere).forEach(intersection => {
     groundPos = intersection.point;
   });
-  groundPos.x = groundPos.x += 0.01;
+  groundPos.y = groundPos.y += 0.005;
 
   // prettier-ignore
   var points = [
@@ -159,13 +162,13 @@ function toGround() {
     groundPos
   ];
   var curve = new THREE.CatmullRomCurve3(points);
-  curvePoints = curve.getPoints(8000);
+  curvePoints = curve.getPoints(travelTime);
   // splineMesh.spline = curve;
   // splineMesh.geometry.vertices = curve.getPoints(40);
   // splineMesh.geometry.verticesNeedUpdate = true;
 
   const splineTween = new TWEEN.Tween(splineTweens)
-    .to({ t: 8000, fov: 60 }, 2000)
+    .to({ t: travelTime, fov: 60 }, travelTime)
     .easing(TWEEN.Easing.Sinusoidal.InOut)
     .onUpdate(() => {
       camera.position.copy(curvePoints[Math.trunc(splineTweens.t)]);
@@ -185,7 +188,6 @@ function toGround() {
       setPointerControls();
       updateInfo();
       onGround = true;
-      goingToGround = true;
     });
 
   downTweens.push(splineRotTween);
@@ -193,12 +195,19 @@ function toGround() {
 }
 
 function setupControls() {
+  const orgCamera = new THREE.PerspectiveCamera(
+    15,
+    window.innerWidth / window.innerHeight,
+    0.0001,
+    50
+  );
+  orgCamera.position.set(0, 0, 15);
   conPointer = new THREE.PointerLockControls(orgCamera);
   conPointer.speedFactor = 0.1;
   camera = conPointer.getObject();
 
   conOrbit = new THREE.TrackballControls(camera, renderer.domElement);
-  conOrbit.maxDistance = 40;
+  conOrbit.maxDistance = 35;
   conOrbit.enabled = false;
 }
 
@@ -269,12 +278,14 @@ function generateInfo(visible) {
 }
 
 function updateInfo() {
+  if (onGround || inSky) document.getElementById("travel").style.opacity = "1";
+  else document.getElementById("travel").style.opacity = "0.";
   if (conPointer.isLocked && onGround)
     document.getElementById("exitpointer").style.opacity = "1";
-  else document.getElementById("exitpointer").style.opacity = "0.1";
+  else document.getElementById("exitpointer").style.opacity = "0.";
   if (!conPointer.isLocked && onGround)
     document.getElementById("enterpointer").style.opacity = "1";
-  else document.getElementById("enterpointer").style.opacity = "0.1";
+  else document.getElementById("enterpointer").style.opacity = "0.";
 }
 
 function addNewNoise(density, height) {
@@ -407,7 +418,6 @@ function setPreset(seed, colors, noiseLayers, maxLevel, minLevel) {
   refreshIcosphere();
 }
 
-// dat.gui ui
 function datGui() {
   var Variables = function() {
     this.wireframe = false;
@@ -420,14 +430,14 @@ function datGui() {
     this.tessZoomOut = false;
     this.addDetail = () => {
       t0 = performance.now();
-      addDetail(faceCache);
+      addDetail(faceCache, false);
       icosphere.geometry.elementsNeedUpdate = true;
       t1 = performance.now();
       console.log("AddDetail took " + (t1 - t0) + " milliseconds.");
     };
     this.addDetailOptimized = () => {
       t0 = performance.now();
-      addDetail(findVisibleFaces(faceCache));
+      addDetail(findVisibleFaces(faceCache), true);
       icosphere.geometry.elementsNeedUpdate = true;
       t1 = performance.now();
       console.log("AddDetailOpt took " + (t1 - t0) + " milliseconds.");
@@ -485,9 +495,7 @@ function datGui() {
   folder5 = folder4.addFolder("Noise");
   folder6 = folder4.addFolder("Height");
   folder7 = gui.addFolder("Presets");
-  // folder2.open();
   folder3.open();
-  folder4.open();
   folder5.open();
   folder6.open();
 
