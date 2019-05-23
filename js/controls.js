@@ -1,3 +1,6 @@
+var downTweens = [];
+var upTweens = [];
+
 function initControls() {
   document.body.onkeyup = e => {
     // culling - f
@@ -18,182 +21,193 @@ function initControls() {
     }
 
     // testing - p
-    if (e.keyCode == 80) {
-      if (onGround) setPointerControls();
-      // } else {
-      //   setOrbitControls();
-      // }
-    }
+    if (e.keyCode == 80) setPointerControls();
+    if (e.keyCode == 79) setOrbitControls();
 
     // camera travel - space
     if (e.keyCode == 32) {
-      if (onGround) {
-        toSky();
-      } else if (
-        pointer.position.x != 0 &&
-        pointer.position.y != 0 &&
-        pointer.position.z != 0
-      ) {
-        toGround();
-      }
+      if (onGround) toSky();
+      else toGround();
     }
   };
 
   setupControls();
   setOrbitControls();
 
+  // prettier-ignore
   presets.earth = [
     41,
-    [
-      [[59, 97, 188], 0.0],
+    [ [[59, 97, 188], 0.0],
       [[210, 203, 94], 0.01],
       [[71, 155, 53], 0.2],
-      [[255, 255, 255], 1]
-    ],
-    [[0.6, 1], [1.3, 0.9], [6, 0.2]],
-    0.2,
-    0
+      [[255, 255, 255], 1] ],
+      [[0.6, 1], [1.3, 0.9], [6, 0.2]], 0.2, 0
   ];
+  // prettier-ignore
   presets.sun = [
     15,
-    [
-      [[240, 93, 13], 0.0],
+    [ [[240, 93, 13], 0.0],
       [[210, 210, 28], 0.5],
       [[255, 250, 229], 0.7],
-      [[255, 255, 255], 1]
-    ],
-    [[1, 1], [7.18, 0.7], [3, 0.7]],
-    0.01,
-    -0.01
+      [[255, 255, 255], 1]],
+      [[1, 1], [7.18, 0.7], [3, 0.7]], 0.01, -0.01
   ];
+  // prettier-ignore
   presets.mars = [
     44,
-    [
-      [[195, 100, 34], 0],
+    [ [[195, 100, 34], 0],
       [[188, 93, 43], 0.3],
       [[233, 111, 27], 0.57],
-      [[110, 69, 63], 1]
-    ],
-    [[1, 0.8], [5, 0.2], [1.5, 0.3]],
-    0.01,
-    -0.01
+      [[110, 69, 63], 1]],
+      [[1, 0.8], [5, 0.2], [1.5, 0.3]], 0.01, -0.01
   ];
 }
 
 function toSky() {
   onGround = false;
-  pointer.material.color.setRGB(0.9, 0.9, 0.9);
-  if (downTween != undefined) downTween.stop();
 
   setOrbitControls();
   conOrbit.enabled = false;
 
-  targetQuarternion = new THREE.Quaternion().setFromEuler(skyRot);
+  downTweens.forEach(tween => {
+    tween.stop();
+  });
 
-  const tweens = {
-    fov: camera.fov,
-    x: camera.position.x,
-    y: camera.position.y,
-    z: camera.position.z,
-    xR: camera.rotation.x,
-    yR: camera.rotation.y,
-    zR: camera.rotation.z
-  };
+  targetQuarternion = new THREE.Quaternion().copy(pointer.quaternion);
+  camera.quaternion.slerp(targetQuarternion, tweens.t);
 
-  upTween = new TWEEN.Tween(tweens)
-    .to(
-      {
-        fov: 15,
-        x: skyPos.x,
-        y: skyPos.y,
-        z: skyPos.z,
-        xR: skyRot.x,
-        yR: skyRot.y,
-        zR: skyRot.z
-      },
-      1000
-    )
-    .easing(TWEEN.Easing.Quadratic.InOut)
-    .onUpdate(() => {
-      camera.position.set(tweens.x, tweens.y, tweens.z);
-      camera.rotation.set(tweens.xR, tweens.yR, tweens.zR);
-      // camera.quaternion.slerp(targetQuarternion, tweens.t);
-
-      camera.fov = tweens.fov;
-      camera.updateProjectionMatrix();
-    })
+  upPosTween = new TWEEN.Tween(camera.position)
+    .to({ x: skyPos.x, y: skyPos.y, z: skyPos.z }, 1000)
     .onComplete(() => {
-      conOrbit.enabled = true;
-      // pointer.visible = true;
-      // console.log(camera.rotation);
+      // conOrbit.enabled = true;
+      // conPointer = new THREE.PointerLockControls(camera);
+      // conPointer.speedFactor = 0.1;
+      setOrbitControls();
     });
-  upTween.start();
+  upTweens.push(upPosTween);
+  upPosTween.start();
+
+  // upRotTween = new TWEEN.Tween(camera.rotation).to(
+  //   { x: skyRot.x, y: skyRot.y, z: skyRot.z },
+  //   1000
+  // );
+  upRotTween = new TWEEN.Tween(camera.rotation).to(
+    { x: skyRot.x, y: skyRot.y, z: skyRot.z },
+    1000
+  );
+  upTweens.push(upRotTween);
+  upRotTween.start();
+
+  upFovTween = new TWEEN.Tween(camera).to({ fov: 15 }, 1000).onUpdate(() => {
+    camera.updateProjectionMatrix();
+  });
+  upTweens.push(upFovTween);
+  upFovTween.start();
 }
 
+//TODO: travel aeg kasutades axe kaugust
+// targetQuarternion = new THREE.Quaternion().copy(pointer.quaternion);
+// camera.quaternion.slerp(targetQuarternion, tweens.t);
+//TODO: ease
+//TODO: slerp
+
 function toGround() {
-  // pointer.visible = false;
   onGround = true;
   if (upTween == undefined || !upTween._isPlaying) {
     skyPos.copy(camera.position);
     skyRot.copy(camera.rotation);
   }
 
-  if (upTween != undefined) upTween.stop();
+  upTweens.forEach(tween => {
+    tween.stop();
+  });
   conOrbit.enabled = false;
-  // pointer.material.color.setRGB(0.7, 0.9, 0.7);
 
-  targetQuarternion = new THREE.Quaternion().copy(pointer.quaternion);
-  targetMesh = new THREE.Mesh().copy(pointer);
-  // camera.lookAt(targetMesh.position);
-  // console.log(targetMesh.position);
-  // console.log(multiplyPos(vec3ToArray(targetMesh.position), 2));
-  // camera.lookAt(...multiplyPos(vec3ToArray(targetMesh.position), 2));
+  closestIsFinal = false;
+  closestAxePos = new THREE.Vector3(0, 0, 0);
+  for (let i = 0; i < skyAxeArray.length; i++) {
+    if (
+      vecDistance(camera.position, skyAxeArray[i].position) <
+      vecDistance(camera.position, closestAxePos)
+    ) {
+      if (i == 1) closestIsFinal = true;
+      else closestIsFinal = false;
+      closestAxePos = skyAxeArray[i].position;
+    }
+  }
 
-  const tweens = {
-    fov: camera.fov,
-    x: camera.position.x,
-    y: camera.position.y,
-    z: camera.position.z,
-    xR: camera.rotation.x,
-    yR: camera.rotation.y,
-    zR: camera.rotation.z,
-    t: 0
-  };
-  downTween = new TWEEN.Tween(tweens)
-    .to(
-      {
-        fov: 60,
-        x: pointer.position.x,
-        y: pointer.position.y,
-        z: pointer.position.z,
-        xR: pointer.rotation.x,
-        yR: pointer.rotation.y,
-        zR: pointer.rotation.z,
-        t: 1
-      },
-      3000
-    )
-    .easing(TWEEN.Easing.Quadratic.InOut)
+  axeTween = new TWEEN.Tween(camera.position)
+    .to({ x: closestAxePos.x, y: closestAxePos.y, z: closestAxePos.z }, 3000)
     .onUpdate(() => {
-      camera.position.set(tweens.x, tweens.y, tweens.z);
-      // camera.rotation.set(tweens.xR, tweens.yR, tweens.zR);
-      // camera.up.set(...multiplyPos(vec3ToArray(targetMesh.position), 2));
-      // camera.lookAt(...multiplyPos(vec3ToArray(targetMesh.position), 1.001));
-      // camera.quaternion.slerp(targetQuarternion, tweens.t);
+      camera.lookAt(new THREE.Vector3(0, 0, 0));
+    })
+    .onComplete(() => {
+      finalPosTween.start();
+      finalRotTween.start();
+      finalFovTween.start();
+    });
+  downTweens.push(axeTween);
 
-      camera.fov = tweens.fov;
+  finalPosTween = new TWEEN.Tween(camera.position)
+    .to(
+      { x: skyAxes.position.x, y: skyAxes.position.y, z: skyAxes.position.z },
+      1000
+    )
+    .onStart(() => {
+      skyPos.copy(camera.position);
+      skyRot.copy(camera.rotation);
+    })
+    .onUpdate(() => {
+      camera.lookAt(new THREE.Vector3(0, 0, 0));
       camera.updateProjectionMatrix();
     })
     .onComplete(() => {
+      groundTween.start();
+    });
+  downTweens.push(finalPosTween);
+
+  finalFovTween = new TWEEN.Tween(camera).to({ fov: 60 }, 1000);
+  downTweens.push(finalFovTween);
+
+  finalRotTween = new TWEEN.Tween(camera.rotation).to(
+    { x: -Math.PI / 2, y: 0, z: 0 },
+    1000
+  );
+  downTweens.push(finalRotTween);
+
+  var groundPos;
+  raycaster.set(skyAxes.position, new THREE.Vector3(0, -1, 0));
+  raycaster.intersectObject(icosphere).forEach(intersection => {
+    groundPos = intersection.point;
+  });
+
+  groundTween = new TWEEN.Tween(camera.position)
+    .to({ x: groundPos.x, y: groundPos.y + 0.005, z: groundPos.z }, 1000)
+    .onStart(() => {
+      // skyPos.copy(camera.position);
+      // skyRot.copy(camera.rotation);
+    })
+    .onComplete(() => {
+      // setOrbitControls();
       setPointerControls();
     });
-  downTween.start();
+  downTweens.push(groundTween);
+
+  if (closestIsFinal) {
+    finalPosTween.start();
+    finalRotTween.start();
+    finalFovTween.start();
+  } else {
+    axeTween.start();
+  }
 }
 
 function setupControls() {
   conPointer = new THREE.PointerLockControls(orgCamera);
   conPointer.speedFactor = 0.1;
   camera = conPointer.getObject();
+  // camera.rotation.set(0, 1, 0);
+  // camera.position.set(0, 10, 15);
 
   conOrbit = new THREE.TrackballControls(camera, renderer.domElement);
   conOrbit.maxDistance = 40;
@@ -201,16 +215,14 @@ function setupControls() {
 }
 
 function setPointerControls() {
-  conOrbit.enabled = false;
-  // pointer.visible = false;
   conPointer.lock();
+  conOrbit.enabled = false;
 }
 
 function setOrbitControls() {
   conPointer.unlock();
   conOrbit.enabled = true;
-  // pointer.visible = true;
-  controls = conOrbit;
+  // controls = conOrbit;
 }
 
 var asd = 0;
@@ -257,11 +269,6 @@ function onWindowResize() {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
-}
-
-function onMouseMove(event) {
-  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 }
 
 function generateInfo(visible) {

@@ -75,6 +75,8 @@
 
       var skyPos = new THREE.Vector3();
       var skyRot = new THREE.Euler();
+      var orgRot = new THREE.Euler();
+      var skyAxes;
       var testVec = new THREE.Vector3(0, 0, 0);
       var target = new THREE.Vector3(3, -6, 6); // create on init
       var downTween, upTween;
@@ -273,7 +275,7 @@
           10000
         );
         orgCamera.position.set(0, 0, 15);
-        scene.add(orgCamera);
+        // scene.add(orgCamera);
         // camera = orgCamera;
 
         // Dat.GUI
@@ -290,21 +292,36 @@
         group = new THREE.Object3D();
         group.add(icosphere);
         scene.add(group);
+
+        skyAxes = new THREE.AxesHelper(0.3);
+        skyAxes.position.set(0, 2.8, 0);
+        icosphere.add(skyAxes);
+
         axes = new THREE.AxesHelper(2);
         axes.visible = false;
         icosphere.add(axes);
 
+        tetra = new THREE.Mesh(
+          new THREE.TetrahedronGeometry(2.8),
+          new THREE.MeshBasicMaterial({ color: 0x009900, wireframe: true })
+        );
+        // icosphere.add(tetra);
+        tetra.rotation.set(-Math.PI / 3.3, Math.PI / 4, Math.PI / 2);
+
+        skyAxeArray = [];
+        tetra.updateMatrixWorld();
+        for (let i = 0; i < tetra.geometry.vertices.length; i++) {
+          var vector = tetra.geometry.vertices[i].clone();
+          vector.applyMatrix4(tetra.matrixWorld);
+
+          tetraAxe = new THREE.AxesHelper(0.3);
+          tetraAxe.position.copy(vector);
+          skyAxeArray.push(tetraAxe);
+          // icosphere.add(tetraAxe);
+        }
+
         // Raycaster
         raycaster = new THREE.Raycaster();
-        window.addEventListener("mousemove", onMouseMove, false);
-        pointer = new THREE.Mesh(
-          new THREE.SphereGeometry(0.03, 8, 8),
-          new THREE.MeshBasicMaterial({ color: 0xffffff })
-        );
-        pointer.material.color.setRGB(0.9, 0.9, 0.9);
-        // pointer.add(new THREE.AxesHelper(0.1));
-        pointer.visible = false;
-        scene.add(pointer);
 
         initControls();
         setPreset(...presets.earth);
@@ -321,22 +338,11 @@
           // conOrbit.update();
         }
 
-        raycaster.setFromCamera(mouse, camera);
-        var intersects = raycaster.intersectObject(icosphere);
-        if (intersects.length == 0) {
-          pointer.position.set(0, 0, 0);
-        } else {
-          for (var i = 0; i < intersects.length; i++) {
-            const point = intersects[i].point;
-            pointer.position.set(...multiplyPos(vec3ToArray(point), 1.005));
-          }
-        }
-
         TWEEN.update();
 
         // focus on canvas in case gui has been pressed
-        renderer.domElement.setAttribute("tabIndex", "0");
-        renderer.domElement.focus();
+        // renderer.domElement.setAttribute("tabIndex", "0");
+        // renderer.domElement.focus();
 
         render();
 
