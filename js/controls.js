@@ -279,13 +279,13 @@ function generateInfo(visible) {
 
 function updateInfo() {
   if (onGround || inSky) document.getElementById("travel").style.opacity = "1";
-  else document.getElementById("travel").style.opacity = "0.";
+  else document.getElementById("travel").style.opacity = "0.1";
   if (conPointer.isLocked && onGround)
     document.getElementById("exitpointer").style.opacity = "1";
-  else document.getElementById("exitpointer").style.opacity = "0.";
+  else document.getElementById("exitpointer").style.opacity = "0.1";
   if (!conPointer.isLocked && onGround)
     document.getElementById("enterpointer").style.opacity = "1";
-  else document.getElementById("enterpointer").style.opacity = "0.";
+  else document.getElementById("enterpointer").style.opacity = "0.1";
 }
 
 function addNewNoise(density, height) {
